@@ -27,6 +27,7 @@
     "dev:collector": "cd collector && yarn dev",
     "dev:frontend": "cd frontend && yarn dev",
     "dev": "npx concurrently \"yarn dev:server\" \"yarn dev:frontend\" \"yarn dev:collector\"",
+    "dev:desktop": "ANYTHING_LLM_RUNTIME=desktop yarn dev",
     "prisma:generate": "cd server && npx prisma generate",
     "prisma:migrate": "cd server && npx prisma migrate dev --name init",
     "prisma:seed": "cd server && npx prisma db seed",

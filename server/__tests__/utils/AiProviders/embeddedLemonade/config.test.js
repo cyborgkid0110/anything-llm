@@ -247,4 +247,149 @@ describe("manageEngineOnProviderChange", () => {
     expect(engine.prepareInBackground).not.toHaveBeenCalled();
     expect(engine.stop).not.toHaveBeenCalled();
   });
+
+  it("keeps the engine when the embedder still uses it", () => {
+    const { config, engine } = loadWithEngine();
+    process.env.EMBEDDING_ENGINE = "embedded_lemonade";
+    config.manageEngineOnProviderChange(
+      "LLMProvider",
+      "embedded_lemonade",
+      "ollama"
+    );
+    expect(engine.stop).not.toHaveBeenCalled();
+  });
+
+  it("keeps the engine when the LLM still uses it", () => {
+    const { config, engine } = loadWithEngine();
+    process.env.LLM_PROVIDER = "embedded_lemonade";
+    config.manageEngineOnProviderChange(
+      "EmbeddingEngine",
+      "embedded_lemonade",
+      "native"
+    );
+    expect(engine.stop).not.toHaveBeenCalled();
+  });
+});
+
+describe("engineInUse", () => {
+  it.each([
+    [{ LLM_PROVIDER: "embedded_lemonade" }, true],
+    [{ EMBEDDING_ENGINE: "embedded_lemonade" }, true],
+    [{ LLM_PROVIDER: "openai", EMBEDDING_ENGINE: "native" }, false],
+    [{}, false],
+  ])("%p -> %p", (env, expected) => {
+    const config = loadConfig();
+    delete process.env.LLM_PROVIDER;
+    delete process.env.EMBEDDING_ENGINE;
+    Object.assign(process.env, env);
+    expect(config.engineInUse()).toBe(expected);
+  });
+});
+
+describe("lemondPlatform", () => {
+  it.each([
+    ["linux", "x64", "linux-x64"],
+    ["linux", "arm64", "linux-arm64"],
+    ["win32", "x64", "windows-x64"],
+    ["win32", "arm64", null],
+    ["darwin", "arm64", null],
+    ["linux", "ia32", null],
+  ])("%s/%s -> %p", (platform, arch, expected) => {
+    expect(loadConfig({ platform, arch }).lemondPlatform()).toBe(expected);
+  });
+});
+
+describe("archiveName", () => {
+  it("is a tarball on Linux and a zip on Windows", () => {
+    const { archiveName, LEMOND_VERSION } = loadConfig();
+    expect(archiveName("linux-x64")).toBe(
+      `lemond-${LEMOND_VERSION}-linux-x64.tar.gz`
+    );
+    expect(archiveName("windows-x64")).toBe(
+      `lemond-${LEMOND_VERSION}-windows-x64.zip`
+    );
+  });
+});
+
+describe("tarBinary", () => {
+  it("uses tar from PATH on POSIX", () => {
+    expect(loadConfig({ platform: "linux" }).tarBinary()).toBe("tar");
+  });
+
+  it("uses Windows' own tar.exe, which can unpack zips", () => {
+    const config = loadConfig({ platform: "win32" });
+    process.env.SystemRoot = "D:\\Win";
+    expect(config.tarBinary()).toBe(
+      require("path").join("D:\\Win", "System32", "tar.exe")
+    );
+    delete process.env.SystemRoot;
+    expect(config.tarBinary()).toBe(
+      require("path").join("C:\\Windows", "System32", "tar.exe")
+    );
+  });
+});
+
+describe("isEnabled in the desktop runtime", () => {
+  it("is enabled on Linux without ENABLE_BUILT_IN_LLM", () => {
+    const config = loadConfig({
+      environ: { ANYTHING_LLM_RUNTIME: "desktop" },
+      runtime: "desktop",
+    });
+    expect(config.isEnabled()).toBe(true);
+    expect(config.supportedProviders()).toEqual(["embedded_lemonade"]);
+  });
+
+  it("ignores a desktop runtime set only in process.env (eg: the .env file)", () => {
+    expect(loadConfig({ environ: {}, runtime: "desktop" }).isEnabled()).toBe(
+      false
+    );
+  });
+
+  it("requires the startup and current runtime to agree", () => {
+    expect(
+      loadConfig({
+        environ: { ANYTHING_LLM_RUNTIME: "desktop" },
+        runtime: "docker",
+      }).isEnabled()
+    ).toBe(false);
+  });
+
+  it("is disabled without a lemond build for the platform", () => {
+    expect(
+      loadConfig({
+        environ: { ANYTHING_LLM_RUNTIME: "desktop" },
+        runtime: "desktop",
+        platform: "darwin",
+      }).isEnabled()
+    ).toBe(false);
+  });
+
+  it("reads the startup snapshot on Windows instead of /proc", () => {
+    const config = loadConfig({
+      environ: null,
+      runtime: "desktop",
+      platform: "win32",
+    });
+    expect(config.isEnabled()).toBe(true);
+  });
+
+  it("ignores a runtime set on Windows after the startup snapshot (eg: dotenv)", () => {
+    const config = loadConfig({
+      environ: null,
+      runtime: "",
+      platform: "win32",
+    });
+    process.env.ANYTHING_LLM_RUNTIME = "desktop";
+    expect(config.isEnabled()).toBe(false);
+  });
+
+  it("keeps Docker on Windows behind ENABLE_BUILT_IN_LLM", () => {
+    expect(
+      loadConfig({
+        environ: null,
+        runtime: "docker",
+        platform: "win32",
+      }).isEnabled()
+    ).toBe(false);
+  });
 });

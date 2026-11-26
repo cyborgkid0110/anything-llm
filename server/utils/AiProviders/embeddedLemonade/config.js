@@ -1,11 +1,10 @@
 const path = require("path");
+const { STARTUP_ENV } = require("../../boot/startupEnv");
 
 /**
- * Embedded Lemonade (`embedded_lemonade`) - a built-in lemond engine for the Linux (Docker) server.
+ * Embedded Lemonade (`embedded_lemonade`) - a built-in lemond engine for the Docker image and the desktop app.
  *
- * Everything for this provider lives in this folder so it can be ignored or deleted downstream (eg: AnythingLLM
- * Desktop, which has its own built-in engine `anythingllm_lemond`). Nothing here runs outside the Docker image or
- * without ENABLE_BUILT_IN_LLM in the container's start environment - see isEnabled().
+ * Everything for this provider lives in this folder. Nothing here runs outside those runtimes - see isEnabled().
  */
 
 /** The provider tag. Distinct from `lemonade` (an external Lemonade server) and desktop's `anythingllm_lemond`. */
@@ -27,21 +26,42 @@ const REGISTRIES = ["auto", "huggingface", "modelscope"];
 /** The largest context window used when the user has not set one - avoids out-of-memory errors on long-context models. */
 const DEFAULT_CONTEXT_WINDOW = 16384;
 
+/** lemond builds on our CDN, keyed by `${process.platform}-${process.arch}`. */
+const LEMOND_PLATFORMS = {
+  "linux-x64": "linux-x64",
+  "linux-arm64": "linux-arm64",
+  "win32-x64": "windows-x64",
+};
+
 /** lemond's platform name for this host, or null when there is no lemond build for it. */
 function lemondPlatform() {
-  if (process.platform !== "linux") return null;
-  if (process.arch === "x64") return "linux-x64";
-  if (process.arch === "arm64") return "linux-arm64";
-  return null;
+  return LEMOND_PLATFORMS[`${process.platform}-${process.arch}`] ?? null;
+}
+
+/** The CDN archive for a lemond platform - zip on Windows, tarball elsewhere. */
+function archiveName(platform) {
+  const extension = platform.startsWith("windows") ? "zip" : "tar.gz";
+  return `lemond-${LEMOND_VERSION}-${platform}.${extension}`;
+}
+
+/** Windows' bundled bsdtar unpacks zips; a GNU tar earlier on PATH (eg: Git for Windows) would not. */
+function tarBinary() {
+  if (process.platform !== "win32") return "tar";
+  return path.join(
+    process.env.SystemRoot || "C:\\Windows",
+    "System32",
+    "tar.exe"
+  );
 }
 
 /**
- * The environment this process was started with - from the docker run command or compose file. Read from
- * /proc/self/environ because process.env also holds values loaded from the .env file (dotenv) or set at runtime,
- * and those must never turn the engine on.
+ * The environment this process was started with - from the docker run command, compose file or the desktop app.
+ * process.env also holds values loaded from the .env file (dotenv) or set at runtime, and those must never turn
+ * the engine on. Linux reads /proc/self/environ; elsewhere the snapshot taken before dotenv (see boot/startupEnv).
  * @returns {Record<string, string>}
  */
 function startupEnv() {
+  if (process.platform !== "linux") return { ...STARTUP_ENV };
   try {
     const fs = require("fs");
     return Object.fromEntries(
@@ -63,20 +83,22 @@ let enabled = null;
 
 /**
  * Whether the embedded engine is available on this instance. Only true when ALL of these hold:
- * - the process is the Docker image (ANYTHING_LLM_RUNTIME=docker, set by the Dockerfile)
- * - ENABLE_BUILT_IN_LLM is set in the docker run command or compose file (not the .env file)
- * - there is a lemond build for this platform (Linux x64/arm64)
+ * - ANYTHING_LLM_RUNTIME is the same in the startup environment and process.env
+ * - the runtime is "desktop", or "docker" with ENABLE_BUILT_IN_LLM set at startup (not in the .env file)
+ * - there is a lemond build for this platform (Linux x64/arm64, Windows x64)
  * Decided once per process since the startup environment cannot change.
  */
 function isEnabled() {
   if (enabled !== null) return enabled;
   const env = startupEnv();
+  const runtime = env.ANYTHING_LLM_RUNTIME;
   const flag = String(env.ENABLE_BUILT_IN_LLM || "").toLowerCase();
   enabled =
-    env.ANYTHING_LLM_RUNTIME === "docker" &&
-    process.env.ANYTHING_LLM_RUNTIME === "docker" &&
-    ["true", "1", "yes"].includes(flag) &&
-    lemondPlatform() !== null;
+    !!runtime &&
+    runtime === process.env.ANYTHING_LLM_RUNTIME &&
+    lemondPlatform() !== null &&
+    (runtime === "desktop" ||
+      (runtime === "docker" && ["true", "1", "yes"].includes(flag)));
   return enabled;
 }
 
@@ -147,18 +169,26 @@ const ENV_KEYS = {
   },
 };
 
+/** Whether the system LLM or the embedder is set to this engine. */
+function engineInUse() {
+  return [process.env.LLM_PROVIDER, process.env.EMBEDDING_ENGINE].includes(
+    PROVIDER
+  );
+}
+
 /**
- * updateENV hook for the system LLM provider. Moving off this provider unloads every model and stops lemond so
- * its RAM and VRAM are freed; moving onto it starts lemond in the background.
+ * updateENV hook for the system LLM provider and the embedder. Moving the last user off this engine unloads every
+ * model and stops lemond so its RAM and VRAM are freed; moving onto it starts lemond in the background.
  * @param {string} _key
- * @param {string} prev - the previous LLM_PROVIDER
- * @param {string} next - the new LLM_PROVIDER
+ * @param {string} prev - the previous provider
+ * @param {string} next - the new provider
  */
 function manageEngineOnProviderChange(_key, prev, next) {
   if (prev === next || !isEnabled()) return;
   if (prev !== PROVIDER && next !== PROVIDER) return;
   const { EmbeddedLemonadeEngine } = require("./engine");
   if (next === PROVIDER) return EmbeddedLemonadeEngine.prepareInBackground();
+  if (engineInUse()) return;
   // Not awaited - lemond can take a few seconds to shut down and the settings save should not wait on it.
   EmbeddedLemonadeEngine.stop().catch((e) =>
     EmbeddedLemonadeEngine.log(`Stop failed: ${e.message}`)
@@ -183,6 +213,8 @@ module.exports = {
   REGISTRIES,
   DEFAULT_CONTEXT_WINDOW,
   lemondPlatform,
+  archiveName,
+  tarBinary,
   isEnabled,
   supportedProviders,
   port,
@@ -192,4 +224,5 @@ module.exports = {
   validTokenLimit,
   settings,
   manageEngineOnProviderChange,
+  engineInUse,
 };

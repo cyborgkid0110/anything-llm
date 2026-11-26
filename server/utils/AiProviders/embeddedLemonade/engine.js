@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
-const { spawn, execFile } = require("child_process");
+const { spawn, spawnSync, execFile } = require("child_process");
 const { Readable } = require("stream");
 const { pipeline } = require("stream/promises");
 const {
@@ -9,6 +9,8 @@ const {
   LLAMACPP_VERSION,
   CDN_BASE,
   lemondPlatform,
+  archiveName,
+  tarBinary,
   isEnabled,
   port,
   paths,
@@ -102,7 +104,8 @@ class EmbeddedLemonadeEngine {
   }
 
   static get binPath() {
-    return path.join(paths().lemond, "lemond");
+    const exe = process.platform === "win32" ? "lemond.exe" : "lemond";
+    return path.join(paths().lemond, exe);
   }
 
   /** Whether the lemond HTTP API is up. */
@@ -183,7 +186,7 @@ class EmbeddedLemonadeEngine {
     )
       return;
 
-    const archive = `lemond-${LEMOND_VERSION}-${lemondPlatform()}.tar.gz`;
+    const archive = archiveName(lemondPlatform());
     const staging = `${dest}.new`;
     fs.rmSync(staging, { recursive: true, force: true });
     fs.mkdirSync(staging, { recursive: true });
@@ -196,15 +199,17 @@ class EmbeddedLemonadeEngine {
     // The archive has a single top-level folder - strip it so lemond lands directly in the engine dir.
     await new Promise((resolve, reject) =>
       execFile(
-        "tar",
-        ["-xzf", archivePath, "-C", staging, "--strip-components=1"],
+        tarBinary(),
+        ["-xf", archivePath, "-C", staging, "--strip-components=1"],
         (error) => (error ? reject(error) : resolve())
       )
     );
     fs.rmSync(archivePath, { force: true });
-    if (!fs.existsSync(path.join(staging, "lemond")))
+    const exe = path.basename(this.binPath);
+    if (!fs.existsSync(path.join(staging, exe)))
       throw new Error(`${archive} did not contain a lemond executable.`);
-    fs.chmodSync(path.join(staging, "lemond"), 0o755);
+    if (process.platform !== "win32")
+      fs.chmodSync(path.join(staging, exe), 0o755);
     fs.writeFileSync(path.join(staging, ".lemond-version"), LEMOND_VERSION);
 
     // Swap the new engine in, keeping the old one until the new one is in place.
@@ -332,8 +337,13 @@ class EmbeddedLemonadeEngine {
         "127.0.0.1",
         "--no-broadcast",
       ],
-      // Its own process group, so stopping lemond also stops the llama.cpp backends it started.
-      { stdio: ["ignore", "pipe", "pipe"], detached: true }
+      // Its own process group on POSIX, so stopping lemond also stops the llama.cpp backends it started.
+      // On Windows detached would open a console window; taskkill /T covers the tree instead.
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: process.platform !== "win32",
+        windowsHide: true,
+      }
     );
     this.process = child;
     this.#spawnError = null;
@@ -365,11 +375,18 @@ class EmbeddedLemonadeEngine {
   }
 
   /**
-   * Sends a signal to lemond and the llama.cpp backends it started (its process group).
+   * Sends a signal to lemond and the llama.cpp backends it started (its process group, or its tree on Windows).
    * @param {import("child_process").ChildProcess} child
    * @param {NodeJS.Signals} signal
    */
   static #signal(child, signal) {
+    // Windows console processes have no SIGTERM - lemond has already been asked to unload by then.
+    if (process.platform === "win32") {
+      spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+        windowsHide: true,
+      });
+      return;
+    }
     try {
       process.kill(-child.pid, signal);
     } catch {
