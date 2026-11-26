@@ -39,7 +39,12 @@ class EncryptionManager {
       this.log("Self-assigning key & salt for encrypting arbitrary data.");
       process.env[this.#keyENV] = crypto.randomBytes(32).toString("hex");
       process.env[this.#saltENV] = crypto.randomBytes(32).toString("hex");
-      dumpENV();
+      try {
+        dumpENV();
+      } catch (e) {
+        // Read-only installs cannot write the .env; the key stays in process.env for this run.
+        this.log(`Could not persist the encryption key & salt: ${e.message}`);
+      }
     } else
       this.log("Loaded existing key & salt for encrypting arbitrary data.");
 

@@ -1,5 +1,9 @@
 const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  ...(process.env.ANYTHING_LLM_DATABASE_URL
+    ? { datasourceUrl: process.env.ANYTHING_LLM_DATABASE_URL }
+    : {}),
+});
 
 async function main() {
   const settings = [

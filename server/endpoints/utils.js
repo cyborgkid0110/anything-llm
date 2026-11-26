@@ -1,4 +1,5 @@
 const { SystemSettings } = require("../models/systemSettings");
+const { isDocker, isDesktop } = require("../utils/helpers/runtime");
 const {
   flexUserRoleValid,
   ROLES,
@@ -99,7 +100,7 @@ function utilEndpoints(app) {
 }
 
 function getGitVersion() {
-  if (process.env.ANYTHING_LLM_RUNTIME === "docker") return "--";
+  if (isDocker() || isDesktop()) return "--";
   try {
     return require("child_process")
       .execSync("git rev-parse HEAD")

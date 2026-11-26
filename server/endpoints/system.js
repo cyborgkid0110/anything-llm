@@ -854,7 +854,9 @@ function systemEndpoints(app) {
         const userRecord = await User.get({ id: user.id });
         const oldPfpFilename = userRecord.pfpFilename;
         if (oldPfpFilename) {
-          const storagePath = path.join(__dirname, "../storage/assets/pfp");
+          const storagePath = process.env.STORAGE_DIR
+            ? path.join(process.env.STORAGE_DIR, "assets/pfp")
+            : path.join(__dirname, "../storage/assets/pfp");
           const oldPfpPath = path.join(
             storagePath,
             normalizePath(userRecord.pfpFilename)
@@ -941,7 +943,9 @@ function systemEndpoints(app) {
         const oldPfpFilename = userRecord.pfpFilename;
 
         if (oldPfpFilename) {
-          const storagePath = path.join(__dirname, "../storage/assets/pfp");
+          const storagePath = process.env.STORAGE_DIR
+            ? path.join(process.env.STORAGE_DIR, "assets/pfp")
+            : path.join(__dirname, "../storage/assets/pfp");
           const oldPfpPath = path.join(
             storagePath,
             normalizePath(oldPfpFilename)

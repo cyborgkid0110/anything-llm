@@ -17,9 +17,10 @@ const vectorCachePath =
     ? path.resolve(__dirname, `../../storage/vector-cache`)
     : path.resolve(process.env.STORAGE_DIR, `vector-cache`);
 const hotdirPath =
-  process.env.NODE_ENV === "development"
+  process.env.COLLECTOR_HOTDIR ||
+  (process.env.NODE_ENV === "development"
     ? path.resolve(__dirname, `../../../collector/hotdir`)
-    : path.resolve(process.env.STORAGE_DIR, `../../collector/hotdir`);
+    : path.resolve(process.env.STORAGE_DIR, `../../collector/hotdir`));
 const generatedImagesPath =
   process.env.NODE_ENV === "development"
     ? path.resolve(__dirname, `../../storage/generated-images`)

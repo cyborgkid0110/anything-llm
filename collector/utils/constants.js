@@ -1,4 +1,9 @@
-const WATCH_DIRECTORY = require("path").resolve(__dirname, "../hotdir");
+const path = require("path");
+// The desktop app moves these out of the (read-only) install folder.
+const WATCH_DIRECTORY =
+  process.env.COLLECTOR_HOTDIR || path.resolve(__dirname, "../hotdir");
+const TMP_DIRECTORY =
+  process.env.COLLECTOR_TMPDIR || path.resolve(__dirname, "../storage/tmp");
 
 const ACCEPTED_MIMES = {
   "text/plain": [".txt", ".md", ".org", ".adoc", ".rst"],
@@ -90,5 +95,6 @@ const SUPPORTED_FILETYPE_CONVERTERS = {
 module.exports = {
   SUPPORTED_FILETYPE_CONVERTERS,
   WATCH_DIRECTORY,
+  TMP_DIRECTORY,
   ACCEPTED_MIMES,
 };
