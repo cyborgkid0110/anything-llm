@@ -25,3 +25,22 @@ it("writes to ANYTHING_LLM_ENV_FILE when set", () => {
   expect(dumpENV()).toBe(true);
   expect(fs.readFileSync(target, "utf8")).toMatch(/SIG_KEY='k{32}'/);
 });
+
+describe("default target", () => {
+  const defaultPath = path.resolve(__dirname, "../../../.env");
+
+  it.each([
+    ["unset", undefined],
+    ["empty", ""],
+  ])("writes server/.env when ANYTHING_LLM_ENV_FILE is %s", (_, value) => {
+    process.env = { ...ORIGINAL_ENV, SIG_KEY: "k".repeat(32) };
+    delete process.env.ANYTHING_LLM_ENV_FILE;
+    if (value !== undefined) process.env.ANYTHING_LLM_ENV_FILE = value;
+    const { dumpENV } = require("../../../utils/helpers/updateENV");
+    const write = jest.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+    expect(dumpENV()).toBe(true);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(path.resolve(write.mock.calls[0][0])).toBe(defaultPath);
+    write.mockRestore();
+  });
+});
