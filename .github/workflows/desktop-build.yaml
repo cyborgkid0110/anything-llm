@@ -4,10 +4,21 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# master-dev is the custom app's main line; feature branches merge into it through pull requests once this passes.
+# A v* tag on master-dev builds, smoke-tests and publishes a GitHub release (path filters don't apply to tags).
 on:
   workflow_dispatch:
   push:
-    branches: ["feat/custom-desktop"]
+    branches: ["master-dev", "feat/**"]
+    tags: ["v*"]
+    paths:
+      - "desktop/**"
+      - "server/**"
+      - "collector/**"
+      - "frontend/**"
+      - ".github/workflows/desktop-build.yaml"
+  pull_request:
+    branches: ["master-dev"]
     paths:
       - "desktop/**"
       - "server/**"
@@ -169,3 +180,45 @@ jobs:
             ${{ runner.temp }}/smoke-data/logs
             ${{ runner.temp }}/smoke-data/smoke-result.txt
           if-no-files-found: ignore
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require the tag to be on master-dev
+        run: |
+          git fetch origin master-dev
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master-dev || {
+            echo "::error title=Release refused::${GITHUB_REF_NAME} is not on master-dev"
+            exit 1
+          }
+
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: anythingllm-custom-*
+          path: release
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          notes=".github/release-notes/${tag}.md"
+          [ -f "$notes" ] || { echo "::error title=Release refused::missing $notes"; exit 1; }
+          # A version with a suffix (eg 1.20.0-beta1) is a prerelease.
+          prerelease=""
+          case "$tag" in *-*) prerelease="--prerelease" ;; esac
+          (cd release && sha256sum * > SHA256SUMS.txt && ls -la)
+          gh release create "$tag" release/* --verify-tag $prerelease \
+            --title "AnythingLLM Custom ${tag#v}" --notes-file "$notes"

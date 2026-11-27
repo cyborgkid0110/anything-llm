@@ -1,7 +1,7 @@
 {
   "name": "anythingllm-desktop",
   "productName": "AnythingLLM",
-  "version": "1.20.0",
+  "version": "1.20.0-beta1",
   "description": "AnythingLLM desktop app: private AI workspace with local models",
   "homepage": "https://github.com/cyborgkid0110/anything-llm",
   "author": "cyborgkid0110 <cyborgkid0110@users.noreply.github.com>",
