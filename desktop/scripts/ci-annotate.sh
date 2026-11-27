@@ -13,7 +13,7 @@ if [ ! -f "$log" ]; then
   exit 0
 fi
 
-errors=$(grep -iE "error|fail|ENOSPC|EACCES|cannot|not found|exited with|⨯" "$log" | tail -n 30 | encode)
+errors=$(grep -iE "error|fail|ENOSPC|EACCES|cannot|not found|exited with|⨯|●|✕" "$log" | tail -n 30 | encode)
 [ -n "$errors" ] && echo "::error title=${title} (error lines)::${errors}"
 echo "::error title=${title} (last ${lines} lines)::$(grep -v '^[[:space:]]*$' "$log" | tail -n "$lines" | encode)"
 exit 0

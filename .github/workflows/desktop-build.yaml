@@ -81,17 +81,25 @@ jobs:
       - name: Test (Linux)
         if: runner.os == 'Linux'
         run: |
+          set +e
           yarn setup:envs
-          npx jest server collector desktop
+          npx jest --ci server collector desktop 2>&1 | tee test.log
+          status=${PIPESTATUS[0]}
+          [ "$status" -eq 0 ] || bash desktop/scripts/ci-annotate.sh "jest failed" test.log 80
+          exit "$status"
 
       # Deliberately minimal: the desktop suite plus the server suites for the
       # Windows engine and runtime branches. Other server tests may assume POSIX.
       - name: Test (Windows)
         if: runner.os == 'Windows'
-        run: >
-          npx jest desktop
-          server/__tests__/utils/AiProviders/embeddedLemonade
-          server/__tests__/utils/helpers/runtime.test.js
+        run: |
+          set +e
+          npx jest --ci desktop \
+            server/__tests__/utils/AiProviders/embeddedLemonade \
+            server/__tests__/utils/helpers/runtime.test.js 2>&1 | tee test.log
+          status=${PIPESTATUS[0]}
+          [ "$status" -eq 0 ] || bash desktop/scripts/ci-annotate.sh "jest failed" test.log 80
+          exit "$status"
 
       # The build needs ~14 GB with everything installed, which is the whole
       # runner disk. prepare-resources reinstalls production dependencies into
