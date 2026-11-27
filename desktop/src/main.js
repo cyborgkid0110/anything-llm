@@ -21,12 +21,14 @@ const { registerIpc } = require("./ipc");
 const { createTray, hideOnClose } = require("./tray");
 const { registerShortcuts, unregisterShortcuts } = require("./shortcuts");
 
-// Tests and dev runs point this at a throwaway profile.
-if (process.env.ANYTHINGLLM_DESKTOP_USER_DATA)
-  app.setPath(
-    "userData",
-    path.resolve(process.env.ANYTHINGLLM_DESKTOP_USER_DATA)
-  );
+// Own folder so this build never shares data with the official desktop app; tests and dev runs
+// point it at a throwaway profile.
+app.setPath(
+  "userData",
+  process.env.ANYTHINGLLM_DESKTOP_USER_DATA
+    ? path.resolve(process.env.ANYTHINGLLM_DESKTOP_USER_DATA)
+    : path.join(app.getPath("appData"), "anythingllm-custom")
+);
 
 // CI start check: boot everything, check the API, print one line and exit.
 const smoke = smokeEnabled();
