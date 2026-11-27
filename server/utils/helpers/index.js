@@ -359,6 +359,11 @@ function getEmbeddingEngineSelection() {
     case "lemonade":
       const { LemonadeEmbedder } = require("../EmbeddingEngines/lemonade");
       return new LemonadeEmbedder();
+    case "embedded_lemonade":
+      const {
+        EmbeddedLemonadeEmbedder,
+      } = require("../EmbeddingEngines/embeddedLemonade");
+      return new EmbeddedLemonadeEmbedder();
     default:
       return new NativeEmbedder();
   }

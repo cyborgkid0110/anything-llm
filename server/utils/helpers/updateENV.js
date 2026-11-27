@@ -261,7 +261,11 @@ const KEY_MAPPING = {
   EmbeddingEngine: {
     envKey: "EMBEDDING_ENGINE",
     checks: [supportedEmbeddingModel],
-    postUpdate: [handleVectorStoreReset],
+    postUpdate: [
+      handleVectorStoreReset,
+      require("../AiProviders/embeddedLemonade/config")
+        .manageEngineOnProviderChange,
+    ],
   },
   EmbeddingBasePath: {
     envKey: "EMBEDDING_BASE_PATH",
@@ -1334,6 +1338,7 @@ function supportedEmbeddingModel(input = "") {
     "mistral",
     "openrouter",
     "lemonade",
+    ...require("../AiProviders/embeddedLemonade/config").supportedProviders(),
   ];
   return supported.includes(input)
     ? null
@@ -1756,4 +1761,5 @@ function dumpENV() {
 module.exports = {
   dumpENV,
   updateENV,
+  KEY_MAPPING,
 };

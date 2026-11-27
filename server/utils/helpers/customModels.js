@@ -48,6 +48,8 @@ const SUPPORT_CUSTOM_MODELS = [
   "lemonade",
   "embedded_lemonade",
   "embedded_lemonade-all",
+  "embedded_lemonade-embedding",
+  "embedded_lemonade-embedding-all",
   "minimax",
   "cerebras",
   "omlx",
@@ -194,6 +196,11 @@ async function getCustomModels(
     case "embedded_lemonade-all":
       return await require("../AiProviders/embeddedLemonade").getEmbeddedLemonadeModels(
         provider === "embedded_lemonade-all"
+      );
+    case "embedded_lemonade-embedding":
+    case "embedded_lemonade-embedding-all":
+      return await require("../AiProviders/embeddedLemonade").getEmbeddedLemonadeEmbeddingModels(
+        provider === "embedded_lemonade-embedding-all"
       );
     case "lemonade-stt":
       return await getLemonadeSTTModels(basePath);

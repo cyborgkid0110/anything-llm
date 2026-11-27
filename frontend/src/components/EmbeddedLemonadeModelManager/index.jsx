@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   CheckCircle,
   CircleNotch,
+  FolderOpen,
   Lightning,
   Plus,
 } from "@phosphor-icons/react";
@@ -14,6 +15,12 @@ import ModelTableLayout from "@/components/lib/ModelTable/layout";
 import ModelTableLoadingSkeleton from "@/components/lib/ModelTable/loading";
 import showToast from "@/utils/toast";
 import EmbeddedLemonadeUtils from "./utils";
+import {
+  isDesktopApp,
+  notifyDesktop,
+  openDesktopPath,
+  pickGgufFile,
+} from "@/utils/desktop";
 
 const DOWNLOAD_CANCELLED = "Download cancelled.";
 
@@ -39,8 +46,9 @@ export default function EmbeddedLemonadeModelManager({
   const [loading, setLoading] = useState(true);
   // The one download in flight: { label, percentage }. The server runs one download at a time.
   const [download, setDownload] = useState(null);
-  // Onboarding starts on the recommended models; the full table is one click away.
-  const [showAllModels, setShowAllModels] = useState(!onboarding);
+  // Recommended cards are LLM-only. Onboarding starts on them; the full table is one click away.
+  const showRecommended = onboarding && kind === "llm";
+  const [showAllModels, setShowAllModels] = useState(!showRecommended);
 
   async function fetchModels() {
     setLoading(true);
@@ -96,6 +104,30 @@ export default function EmbeddedLemonadeModelManager({
     }
     await fetchModels();
     selectModel(modelId || modelName);
+    notifyDesktop("Model ready", `${label} is ready to use.`);
+    return true;
+  }
+
+  /**
+   * Imports a .gguf file on this machine, then selects it.
+   * @param {string} filePath
+   * @returns {Promise<boolean>} whether the model was imported
+   */
+  async function importModel(filePath) {
+    const { success, error, modelId } = await EmbeddedLemonadeUtils.importModel(
+      filePath,
+      kind
+    );
+    if (!success) {
+      showToast(error || "Could not import the model.", "error", {
+        clear: true,
+      });
+      return false;
+    }
+    showToast(`Imported ${modelId}.`, "success", { clear: true });
+    await fetchModels();
+    selectModel(modelId);
+    notifyDesktop("Model ready", `${modelId} is ready to use.`);
     return true;
   }
 
@@ -128,13 +160,16 @@ export default function EmbeddedLemonadeModelManager({
         <DownloadStatus download={download} />
       ) : (
         <PullFromHuggingFace
+          kind={kind}
           onPull={(checkpoint) => downloadModel(checkpoint, checkpoint)}
         />
       )}
+      {!download && <ImportLocalModel onImport={importModel} />}
+      {isDesktopApp() && <OpenModelsFolder />}
 
       {showAllModels ? (
         <>
-          {onboarding && (
+          {showRecommended && (
             <button
               type="button"
               onClick={() => setShowAllModels(false)}
@@ -151,6 +186,7 @@ export default function EmbeddedLemonadeModelManager({
             selectModel={selectModel}
             downloadModel={downloadModel}
             uninstallModel={uninstallModel}
+            kind={kind}
           />
         </>
       ) : (
@@ -373,6 +409,7 @@ function ModelSelection({
   selectModel,
   downloadModel,
   uninstallModel,
+  kind,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -431,7 +468,9 @@ function ModelSelection({
       ) : filteredModels.length === 0 ? (
         <div className="flex flex-col w-full gap-y-2 mt-4">
           <p className="text-theme-text-secondary text-sm">
-            No models found! The local LLM engine may still be starting.
+            {kind === "embedding"
+              ? "No embedding models found! The local model engine may still be starting."
+              : "No models found! The local LLM engine may still be starting."}
           </p>
         </div>
       ) : (
@@ -456,7 +495,7 @@ function ModelSelection({
  * Pull any GGUF repository from Hugging Face (or ModelScope, per EMBEDDED_LEMONADE_REGISTRY) as
  * owner/repo[:QUANT] or its URL.
  */
-function PullFromHuggingFace({ onPull }) {
+function PullFromHuggingFace({ onPull, kind }) {
   const [showInput, setShowInput] = useState(false);
   const [repo, setRepo] = useState("");
 
@@ -508,7 +547,11 @@ function PullFromHuggingFace({ onPull }) {
           }}
           className="border-none bg-theme-settings-input-bg text-white placeholder:text-theme-settings-input-placeholder text-sm rounded-lg focus:outline-primary-button active:outline-primary-button outline-none block w-[360px] p-2.5"
           type="text"
-          placeholder="unsloth/Qwen3-4B-GGUF:Q4_K_M"
+          placeholder={
+            kind === "embedding"
+              ? "Qwen/Qwen3-Embedding-0.6B-GGUF:Q8_0"
+              : "unsloth/Qwen3-4B-GGUF:Q4_K_M"
+          }
           autoFocus
         />
         <button
@@ -532,7 +575,11 @@ function PullFromHuggingFace({ onPull }) {
       <p className="text-theme-text-secondary text-xs max-w-[600px]">
         Any GGUF model repository on{" "}
         <a
-          href="https://huggingface.co/models?library=gguf&sort=trending"
+          href={
+            kind === "embedding"
+              ? "https://huggingface.co/models?library=gguf&pipeline_tag=feature-extraction&sort=trending"
+              : "https://huggingface.co/models?library=gguf&sort=trending"
+          }
           target="_blank"
           rel="noreferrer"
           className="text-sky-400 hover:underline"
@@ -541,6 +588,146 @@ function PullFromHuggingFace({ onPull }) {
         </a>
         , as owner/repository with an optional :quantization, or its URL. When
         no quantization is given, Q4_K_M is used if the repository has it.
+      </p>
+    </div>
+  );
+}
+
+/** Desktop app only: opens the models folder in the OS file manager. */
+function OpenModelsFolder() {
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        if (!(await openDesktopPath("models")))
+          showToast("Could not open the models folder.", "error", {
+            clear: true,
+          });
+      }}
+      className="w-fit relative flex h-[40px] items-center border-none hover:bg-theme-bg-sidebar rounded-lg"
+    >
+      <div className="flex w-full gap-x-2 items-center">
+        <div className="border-none bg-theme-bg-secondary p-2 rounded-lg h-[24px] w-[24px] flex items-center justify-center">
+          <FolderOpen
+            weight="bold"
+            size={14}
+            className="shrink-0 text-theme-text-secondary"
+          />
+        </div>
+        <p className="text-left text-theme-text-secondary text-sm">
+          Open models folder
+        </p>
+      </div>
+    </button>
+  );
+}
+
+/**
+ * Import a .gguf file from this machine. The desktop app opens its file picker; otherwise the path is typed in.
+ * @param {{onImport: (filePath: string) => Promise<boolean>}} props
+ */
+function ImportLocalModel({ onImport }) {
+  const [showInput, setShowInput] = useState(false);
+  const [filePath, setFilePath] = useState("");
+  // The file name being imported, or null.
+  const [importing, setImporting] = useState(null);
+
+  async function runImport(pathToImport) {
+    const value = pathToImport.trim();
+    if (!value)
+      return showToast("Enter the path of a .gguf file.", "error", {
+        clear: true,
+      });
+    setImporting(value.split(/[\\/]/).pop());
+    const imported = await onImport(value);
+    setImporting(null);
+    if (imported) {
+      setShowInput(false);
+      setFilePath("");
+    }
+  }
+
+  async function handleClick() {
+    if (!isDesktopApp()) return setShowInput(true);
+    const picked = await pickGgufFile();
+    if (picked) await runImport(picked);
+  }
+
+  if (importing)
+    return (
+      <div className="flex h-[40px] items-center gap-x-2">
+        <div className="border-none bg-theme-bg-secondary p-2 rounded-lg h-[24px] w-[24px] flex items-center justify-center">
+          <CircleNotch
+            weight="bold"
+            size={14}
+            className="shrink-0 animate-spin text-theme-text-secondary"
+          />
+        </div>
+        <p className="text-left text-theme-text-secondary text-sm">
+          Importing {importing}...
+        </p>
+      </div>
+    );
+
+  if (!showInput)
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className="w-fit relative flex h-[40px] items-center border-none hover:bg-theme-bg-sidebar rounded-lg"
+      >
+        <div className="flex w-full gap-x-2 items-center">
+          <div className="border-none bg-theme-bg-secondary p-2 rounded-lg h-[24px] w-[24px] flex items-center justify-center">
+            <Plus
+              weight="bold"
+              size={14}
+              className="shrink-0 text-theme-text-secondary"
+            />
+          </div>
+          <p className="text-left text-theme-text-secondary text-sm">
+            Import local GGUF file
+          </p>
+        </div>
+      </button>
+    );
+
+  return (
+    <div className="flex flex-col gap-y-2">
+      <div className="flex w-full md:w-fit flex-wrap items-center gap-x-2 gap-y-2">
+        <input
+          value={filePath}
+          onChange={(e) => setFilePath(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            runImport(filePath);
+          }}
+          className="border-none bg-theme-settings-input-bg text-white placeholder:text-theme-settings-input-placeholder text-sm rounded-lg focus:outline-primary-button active:outline-primary-button outline-none block w-full md:w-[360px] p-2.5"
+          type="text"
+          placeholder="/path/to/model.gguf"
+          autoFocus
+        />
+        <button
+          type="button"
+          onClick={() => runImport(filePath)}
+          className="transition-all duration-300 border border-slate-200 p-2 rounded-lg text-white text-sm items-center flex gap-x-2 hover:bg-slate-200 hover:text-slate-800"
+        >
+          Import
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setShowInput(false);
+            setFilePath("");
+          }}
+          className="border-none transition-all duration-300 p-2 rounded-lg text-white text-sm items-center flex gap-x-2 hover:bg-red-500"
+        >
+          Cancel
+        </button>
+      </div>
+      <p className="text-theme-text-secondary text-xs max-w-[600px]">
+        The absolute path of a .gguf file on the machine running AnythingLLM.
+        The file is linked or copied into the models folder.
       </p>
     </div>
   );

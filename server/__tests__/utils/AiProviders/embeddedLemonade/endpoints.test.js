@@ -27,6 +27,17 @@ function registerRoutes() {
   return routes;
 }
 
+/** Like registerRoutes, but returns each route's middleware array. */
+function registerMiddleware() {
+  const middleware = {};
+  const app = {};
+  for (const method of ["get", "post", "delete"])
+    app[method] = (route, routeMiddleware) =>
+      (middleware[`${method.toUpperCase()} ${route}`] = routeMiddleware);
+  embeddedLemonadeEndpoints(app);
+  return middleware;
+}
+
 function mockResponse() {
   const response = {
     statusCode: 200,
@@ -101,6 +112,7 @@ describe("embeddedLemonadeEndpoints", () => {
       "GET /utils/embedded-lemonade/recommendations",
       "GET /utils/embedded-lemonade/status",
       "POST /utils/embedded-lemonade/download-model",
+      "POST /utils/embedded-lemonade/import-model",
     ]);
     expect(EmbeddedLemonadeEngine.prepareInBackground).toHaveBeenCalledTimes(1);
   });
@@ -281,5 +293,101 @@ describe("status and recommendations", () => {
     const response = mockResponse();
     await routes["GET /utils/embedded-lemonade/recommendations"]({}, response);
     expect(response.body).toEqual({ recommendations: [] });
+  });
+});
+
+describe("POST /utils/embedded-lemonade/import-model", () => {
+  const route = "POST /utils/embedded-lemonade/import-model";
+
+  it("imports the file and returns the model id", async () => {
+    const spy = jest
+      .spyOn(EmbeddedLemonadeLLM, "importModel")
+      .mockResolvedValue({ modelId: "my-model" });
+    const response = mockResponse();
+    await registerRoutes()[route](
+      { body: { path: "/models/my-model.gguf", kind: "embedding" } },
+      response
+    );
+    expect(spy).toHaveBeenCalledWith("/models/my-model.gguf", {
+      kind: "embedding",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      modelId: "my-model",
+      error: null,
+    });
+  });
+
+  it("defaults the kind to llm and ignores unknown kinds", async () => {
+    const spy = jest
+      .spyOn(EmbeddedLemonadeLLM, "importModel")
+      .mockResolvedValue({ modelId: "m" });
+    await registerRoutes()[route](
+      { body: { path: "/m.gguf", kind: "nope" } },
+      mockResponse()
+    );
+    expect(spy).toHaveBeenCalledWith("/m.gguf", { kind: "llm" });
+  });
+
+  it("returns the import error", async () => {
+    jest
+      .spyOn(EmbeddedLemonadeLLM, "importModel")
+      .mockRejectedValue(new Error("/x.gguf does not exist."));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const response = mockResponse();
+    await registerRoutes()[route]({ body: { path: "/x.gguf" } }, response);
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
+      success: false,
+      modelId: null,
+      error: "/x.gguf does not exist.",
+    });
+  });
+
+  it.each([undefined, null, 42, { path: "/x.gguf" }, ""])(
+    "returns the model's message for a missing or non-string path (%p)",
+    async (filePath) => {
+      const response = mockResponse();
+      await registerRoutes()[route]({ body: { path: filePath } }, response);
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        modelId: null,
+        error: "Enter the absolute path of a .gguf file.",
+      });
+    }
+  );
+
+  it("is admin only, unlike the other model routes", async () => {
+    const middleware = registerMiddleware();
+    const run = async (routeMiddleware, role) => {
+      const next = jest.fn();
+      const response = {
+        locals: { multiUserMode: true, user: { role } },
+        sendStatus: jest.fn(() => response),
+        end: jest.fn(),
+      };
+      // The last entry is flexUserRoleValid(...); validatedRequest needs a real session.
+      await routeMiddleware.at(-1)({}, response, next);
+      return { next, response };
+    };
+
+    const importMiddleware = middleware[route];
+    expect(importMiddleware).toHaveLength(2);
+    for (const role of ["manager", "default"]) {
+      const { next, response } = await run(importMiddleware, role);
+      expect(next).not.toHaveBeenCalled();
+      expect(response.sendStatus).toHaveBeenCalledWith(401);
+    }
+    const { next } = await run(importMiddleware, "admin");
+    expect(next).toHaveBeenCalled();
+
+    // The remove route still lets managers through.
+    const { next: removeNext } = await run(
+      middleware["DELETE /utils/embedded-lemonade/remove-model"],
+      "manager"
+    );
+    expect(removeNext).toHaveBeenCalled();
   });
 });

@@ -121,6 +121,30 @@ function embeddedLemonadeEndpoints(app) {
       }
     }
   );
+
+  // Imports a .gguf file already on this machine (eg: picked in the desktop app). Admin only - it reads a path on
+  // the server's disk.
+  app.post(
+    "/utils/embedded-lemonade/import-model",
+    [validatedRequest, flexUserRoleValid([ROLES.admin])],
+    async (request, response) => {
+      const { path: filePath, kind } = reqBody(request);
+      try {
+        const { modelId } = await EmbeddedLemonadeLLM.importModel(filePath, {
+          kind: kind === "embedding" ? "embedding" : "llm",
+        });
+        response.status(200).json({ success: true, modelId, error: null });
+      } catch (error) {
+        console.error(
+          "Error importing embedded Lemonade model:",
+          error.message
+        );
+        response
+          .status(400)
+          .json({ success: false, modelId: null, error: error.message });
+      }
+    }
+  );
 }
 
 module.exports = { embeddedLemonadeEndpoints };
