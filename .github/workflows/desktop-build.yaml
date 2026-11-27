@@ -40,12 +40,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: yarn
-          cache-dependency-path: |
-            server/yarn.lock
-            collector/yarn.lock
-            frontend/yarn.lock
-            desktop/yarn.lock
+          # No yarn cache here: it would restore several GB onto a 14 GB runner.
 
       - name: Install xvfb
         if: runner.os == 'Linux'
@@ -87,10 +82,24 @@ jobs:
           server/__tests__/utils/AiProviders/embeddedLemonade
           server/__tests__/utils/helpers/runtime.test.js
 
+      # The build needs ~14 GB with everything installed, which is the whole
+      # runner disk. prepare-resources reinstalls production dependencies into
+      # desktop/build, so the dev installs and yarn's cache can go first.
+      - name: Free disk space
+        run: |
+          rm -rf node_modules server/node_modules collector/node_modules
+          yarn cache clean
+          df -h .
+
       - name: Build installer
         run: cd desktop && yarn dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: electron-builder
+
+      - name: Disk usage
+        if: always()
+        run: df -h .
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'

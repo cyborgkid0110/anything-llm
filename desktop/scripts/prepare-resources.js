@@ -19,6 +19,19 @@ function run(cmd, args, options) {
     throw new Error(`${cmd} ${args.join(" ")} failed (${result.status})`);
 }
 
+// CI runners have about 14 GB of disk; the install caches alone take 5 GB.
+const lowDisk = process.env.CI === "true" || process.env.CI === "1";
+
+/** Drops yarn's download cache on CI; it is not needed after an install. */
+function freeCache() {
+  if (!lowDisk) return;
+  try {
+    run("yarn", ["cache", "clean"]);
+  } catch (error) {
+    console.warn(`yarn cache clean failed: ${error.message}`);
+  }
+}
+
 function copyPackage(pkg) {
   const src = path.join(root, pkg);
   fs.cpSync(src, path.join(out, pkg), {
@@ -53,6 +66,7 @@ function main() {
     console.log(`\n== ${pkg}: copy + production install`);
     copyPackage(pkg);
     installProduction(pkg);
+    freeCache();
   }
 
   console.log("\n== prisma generate");
@@ -71,7 +85,9 @@ function main() {
   );
 
   console.log("\n== frontend");
-  if (!fs.existsSync(path.join(root, "frontend", "node_modules")))
+  const frontendModules = path.join(root, "frontend", "node_modules");
+  const installedFrontend = !fs.existsSync(frontendModules);
+  if (installedFrontend) {
     run(
       "yarn",
       ["install", "--frozen-lockfile", "--network-timeout", "600000"],
@@ -79,11 +95,16 @@ function main() {
         cwd: path.join(root, "frontend"),
       }
     );
+    freeCache();
+  }
   run(process.execPath, [
     path.join(__dirname, "build-frontend.js"),
     "--out",
     path.join(out, "server", "public"),
   ]);
+  // Only remove what this run installed.
+  if (lowDisk && installedFrontend)
+    fs.rmSync(frontendModules, { recursive: true, force: true });
 
   console.log(
     `\n== prune native binaries (${process.platform}-${process.arch})`
