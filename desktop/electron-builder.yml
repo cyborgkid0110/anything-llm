@@ -11,6 +11,9 @@ files:
   - package.json
   - "!**/__tests__/**"
 asar: true
+# No auto-update feed. Without this, GITHUB_TOKEN on CI makes electron-builder try to publish to GitHub
+# and crash ("Cannot read properties of null (reading 'channel')").
+publish: null
 afterPack: scripts/afterPack.js
 # Server and collector stay unpacked: they spawn children from plain node_modules.
 # Copied as one folder because a source dir's own top-level node_modules is
