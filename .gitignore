@@ -10,3 +10,6 @@ aws_cf_deploy_anything_llm.json
 yarn.lock
 *.bak
 .idea
+desktop/node_modules
+desktop/dist
+desktop/build
