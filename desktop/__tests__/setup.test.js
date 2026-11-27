@@ -69,3 +69,31 @@ it("fails with a clear error when user data is not writable", () => {
     fs.chmodSync(l.userData, 0o700);
   }
 });
+
+it("stays writable when the bundled files are read-only", () => {
+  if (process.platform === "win32") return;
+  const lock = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }))
+      if (entry.isDirectory()) lock(path.join(dir, entry.name));
+      else fs.chmodSync(path.join(dir, entry.name), 0o444);
+    fs.chmodSync(dir, 0o555);
+  };
+  lock(l.bundledAssets);
+  lock(l.bundledPrisma);
+  try {
+    prepare(l);
+    prepare(l); // the second start must replace the first copy
+    const asset = path.join(l.storage, "assets", "logo.png");
+    fs.writeFileSync(asset, "custom");
+    expect(fs.readFileSync(asset, "utf8")).toBe("custom");
+  } finally {
+    const unlock = (dir) => {
+      fs.chmodSync(dir, 0o755);
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true }))
+        if (entry.isDirectory()) unlock(path.join(dir, entry.name));
+        else fs.chmodSync(path.join(dir, entry.name), 0o644);
+    };
+    unlock(l.bundledAssets);
+    unlock(l.bundledPrisma);
+  }
+});

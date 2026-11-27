@@ -2,6 +2,15 @@ const path = require("path");
 const { app, dialog, shell } = require("electron");
 const { layout, appRootFor } = require("./layout");
 const { pickPorts } = require("./ports");
+const { startBackend } = require("./startup");
+const {
+  SMOKE_TIMEOUT_MS,
+  reportSmoke,
+  smokeEnabled,
+  waitForLoad,
+  checkServer,
+} = require("./smoke");
+const { tailFile } = require("./logs");
 const { prepare, migrate, assertWritable } = require("./setup");
 const backend = require("./backend");
 const { installedChromePath, ensureChrome } = require("./chrome");
@@ -19,6 +28,9 @@ if (process.env.ANYTHINGLLM_DESKTOP_USER_DATA)
     path.resolve(process.env.ANYTHINGLLM_DESKTOP_USER_DATA)
   );
 
+// CI start check: boot everything, check the API, print one line and exit.
+const smoke = smokeEnabled();
+
 // Chromium's single-instance lock lives in userData and fails silently when it
 // is read-only, so check before requesting the lock.
 let writable = true;
@@ -29,7 +41,9 @@ try {
   console.error(error.message);
   // Before ready, Linux prints the box to stderr instead of showing it.
   app.whenReady().then(() => {
-    dialog.showErrorBox("AnythingLLM could not start", error.message);
+    if (!smoke)
+      dialog.showErrorBox("AnythingLLM could not start", error.message);
+    else reportSmoke(app.getPath("userData"), `SMOKE FAIL ${error.message}\n`);
     app.exit(1);
   });
 }
@@ -54,7 +68,26 @@ function closeSplash() {
   if (splash && !splash.isDestroyed()) splash.close();
 }
 
+async function smokeFail(reason) {
+  if (failed) return;
+  failed = true;
+  quitting = true;
+  const logs = l
+    ? ["server", "collector"].map(
+        (name) =>
+          `--- ${name}.log\n${tailFile(path.join(l.logs, `${name}.log`))}`
+      )
+    : [];
+  reportSmoke(
+    app.getPath("userData"),
+    `SMOKE FAIL ${reason}\n${logs.join("\n")}\n`
+  );
+  await running?.stop().catch(() => {});
+  app.exit(1);
+}
+
 async function fail(title, detail) {
+  if (smoke) return smokeFail(`${title} ${detail}`);
   if (failed) return;
   // Set first: closing the splash must not quit the app under the dialog.
   failed = true;
@@ -94,21 +127,26 @@ function chromePathIfInstalled() {
 async function boot() {
   l = layout({ userData: app.getPath("userData"), appRoot: appRootFor(app) });
   splash = createSplash();
+  if (smoke) setTimeout(() => smokeFail("timed out"), SMOKE_TIMEOUT_MS).unref();
   try {
     prepare(l);
     await migrate(l);
-    const ports = await pickPorts();
-    running = backend.start(l, ports, {
-      chromePath: chromePathIfInstalled(),
-      onExit: (name, code) => {
-        if (!quitting)
-          fail(
-            `The ${name} stopped unexpectedly (${code}).`,
-            "See the logs for details."
-          );
+    const started = await startBackend({
+      l,
+      pickPorts,
+      start: (...args) => (running = backend.start(...args)),
+      options: {
+        chromePath: smoke ? undefined : chromePathIfInstalled(),
+        onExit: (name, code) => {
+          if (!quitting)
+            fail(
+              `The ${name} stopped unexpectedly (${code}).`,
+              "See the logs for details."
+            );
+        },
       },
     });
-    await running.waitForServer();
+    const { ports } = started;
 
     const baseUrl = `http://127.0.0.1:${ports.server}`;
     registerIpc(l, new URL(baseUrl).origin);
@@ -118,6 +156,19 @@ async function boot() {
       autoHideMenuBar: app.isPackaged,
     });
     win.once("ready-to-show", closeSplash);
+
+    if (smoke) {
+      await waitForLoad(win.webContents);
+      const summary = await checkServer(baseUrl, process);
+      reportSmoke(
+        app.getPath("userData"),
+        `SMOKE OK ${JSON.stringify(summary)}\n`
+      );
+      quitting = true;
+      await running.stop();
+      app.exit(0);
+      return;
+    }
 
     tray = createTray({
       iconPath: path.join(__dirname, "../assets/icon.png"),

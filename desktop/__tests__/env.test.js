@@ -3,6 +3,7 @@ const {
   serverEnv,
   collectorEnv,
   userNamespacesRestricted,
+  fileUrl,
 } = require("../src/env");
 
 const l = layout({ userData: "/u", appRoot: "/app" });
@@ -37,7 +38,7 @@ describe("serverEnv", () => {
       SERVER_PORT: "4001",
       SERVER_HOST: "127.0.0.1",
       ANYTHING_LLM_ENV_FILE: l.envFile,
-      ANYTHING_LLM_DATABASE_URL: "file:" + l.database,
+      ANYTHING_LLM_DATABASE_URL: fileUrl(l.database),
       ANYTHINGLLM_CHROMIUM_ARGS: "--no-sandbox",
       CHECKPOINT_DISABLE: "1",
     });

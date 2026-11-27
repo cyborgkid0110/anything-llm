@@ -136,7 +136,9 @@ function start(l, ports, { onExit, chromePath } = {}) {
     await serverGone;
   }
 
-  return { waitForServer, restartCollector, stop };
+  const logFiles = { server: server.logFile, collector: collector.logFile };
+
+  return { waitForServer, restartCollector, stop, logFiles };
 }
 
 module.exports = { start };

@@ -16,6 +16,17 @@ function assertWritable(dir) {
   }
 }
 
+/** Copies keep the source's modes, and a read-only install must not make user data read-only. */
+function makeWritable(target) {
+  if (!fs.existsSync(target)) return;
+  fs.chmodSync(target, 0o755);
+  for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
+    const full = path.join(target, entry.name);
+    if (entry.isDirectory()) makeWritable(full);
+    else if (entry.isFile()) fs.chmodSync(full, 0o644);
+  }
+}
+
 /** Creates the user-data folders, seeds assets and refreshes the Prisma copy. */
 function prepare(l) {
   assertWritable(l.userData);
@@ -30,19 +41,21 @@ function prepare(l) {
     fs.mkdirSync(dir, { recursive: true });
 
   // Never overwrite assets the user may have changed.
-  if (fs.existsSync(l.bundledAssets))
-    fs.cpSync(l.bundledAssets, path.join(l.storage, "assets"), {
-      recursive: true,
-      force: false,
-    });
+  const assets = path.join(l.storage, "assets");
+  if (fs.existsSync(l.bundledAssets)) {
+    fs.cpSync(l.bundledAssets, assets, { recursive: true, force: false });
+    makeWritable(assets);
+  }
 
   // Migrations change between versions, so mirror them on every start.
   const migrations = path.join(l.prisma, "migrations");
+  makeWritable(l.prisma);
   fs.rmSync(migrations, { recursive: true, force: true });
   fs.mkdirSync(l.prisma, { recursive: true });
   fs.cpSync(path.join(l.bundledPrisma, "migrations"), migrations, {
     recursive: true,
   });
+  makeWritable(l.prisma);
   const schema = fs.readFileSync(
     path.join(l.bundledPrisma, "schema.prisma"),
     "utf8"

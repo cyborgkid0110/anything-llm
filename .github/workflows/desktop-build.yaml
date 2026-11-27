@@ -1,0 +1,145 @@
+name: Desktop build
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["feat/custom-desktop"]
+    paths:
+      - "desktop/**"
+      - "server/**"
+      - "collector/**"
+      - "frontend/**"
+      - ".github/workflows/desktop-build.yaml"
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-22.04 keeps the glibc baseline of the .deb low.
+        os: [ubuntu-22.04, windows-2022]
+    env:
+      SHARP_IGNORE_GLOBAL_LIBVIPS: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: |
+            server/yarn.lock
+            collector/yarn.lock
+            frontend/yarn.lock
+            desktop/yarn.lock
+
+      - name: Install xvfb
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      # The root has no lockfile (jest only), so it cannot be frozen.
+      - name: Install root dependencies
+        run: yarn install
+
+      # @vscode/ripgrep downloads its binary from GitHub; the token avoids rate limits.
+      - name: Install server dependencies
+        run: cd server && yarn install --frozen-lockfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install collector dependencies
+        run: cd collector && yarn install --frozen-lockfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate the Prisma client
+        run: cd server && npx prisma generate
+
+      - name: Install desktop dependencies
+        run: cd desktop && yarn install --frozen-lockfile
+
+      - name: Test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          yarn setup:envs
+          npx jest server collector desktop
+
+      # Deliberately minimal: the desktop suite plus the server suites for the
+      # Windows engine and runtime branches. Other server tests may assume POSIX.
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        run: >
+          npx jest desktop
+          server/__tests__/utils/AiProviders/embeddedLemonade
+          server/__tests__/utils/helpers/runtime.test.js
+
+      - name: Build installer
+        run: cd desktop && yarn dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        env:
+          ANYTHINGLLM_DESKTOP_SMOKE: "1"
+          ANYTHINGLLM_DESKTOP_USER_DATA: ${{ runner.temp }}/smoke-data
+        run: |
+          # The unpacked build has no setuid chrome-sandbox helper.
+          timeout 240 xvfb-run -a desktop/dist/linux-unpacked/anythingllm-custom --no-sandbox 2>&1 | tee "$RUNNER_TEMP/smoke.out"
+          grep -q "^SMOKE OK" "$RUNNER_TEMP/smoke.out"
+
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ANYTHINGLLM_DESKTOP_SMOKE: "1"
+          ANYTHINGLLM_DESKTOP_USER_DATA: ${{ runner.temp }}\smoke-data
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "smoke.out"
+          $err = Join-Path $env:RUNNER_TEMP "smoke.err"
+          $result = Join-Path $env:ANYTHINGLLM_DESKTOP_USER_DATA "smoke-result.txt"
+          $p = Start-Process -FilePath "desktop\dist\win-unpacked\anythingllm-custom.exe" `
+            -RedirectStandardOutput $out -RedirectStandardError $err `
+            -PassThru -Wait
+          # A GUI exe may have no readable stdout, so the app also writes the
+          # result to a file in its user-data folder.
+          foreach ($f in $out, $err, $result) { if (Test-Path $f) { Get-Content $f } }
+          $ok = (Test-Path $result) -and (Select-String -Path $result -Pattern "^SMOKE OK" -Quiet)
+          if ($p.ExitCode -ne 0 -or -not $ok) {
+            throw "Smoke test failed (exit code $($p.ExitCode))"
+          }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: anythingllm-custom-${{ runner.os }}
+          path: |
+            desktop/dist/*.deb
+            desktop/dist/*.exe
+          if-no-files-found: error
+
+      - name: Upload smoke logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs-${{ runner.os }}
+          path: |
+            ${{ runner.temp }}/smoke.out
+            ${{ runner.temp }}/smoke.err
+            ${{ runner.temp }}/smoke-data/logs
+            ${{ runner.temp }}/smoke-data/smoke-result.txt
+          if-no-files-found: ignore
