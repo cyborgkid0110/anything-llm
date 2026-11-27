@@ -11,6 +11,7 @@ files:
   - package.json
   - "!**/__tests__/**"
 asar: true
+afterPack: scripts/afterPack.js
 # Server and collector stay unpacked: they spawn children from plain node_modules.
 # Copied as one folder because a source dir's own top-level node_modules is
 # always filtered out by electron-builder.
