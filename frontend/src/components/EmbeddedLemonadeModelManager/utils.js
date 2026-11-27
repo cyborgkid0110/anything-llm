@@ -114,6 +114,22 @@ const EmbeddedLemonadeUtils = {
       .then((res) => res.json())
       .catch((e) => ({ success: false, error: e.message }));
   },
+
+  /**
+   * Imports a .gguf file on this machine.
+   * @param {string} path - absolute path
+   * @param {'llm'|'embedding'} kind
+   * @returns {Promise<{success: boolean, modelId: string|null, error: string|null}>}
+   */
+  importModel: async function (path, kind = "llm") {
+    return await fetch(`${API_BASE}/utils/embedded-lemonade/import-model`, {
+      method: "POST",
+      headers: baseHeaders(),
+      body: JSON.stringify({ path, kind }),
+    })
+      .then((res) => res.json())
+      .catch((e) => ({ success: false, modelId: null, error: e.message }));
+  },
 };
 
 export default EmbeddedLemonadeUtils;

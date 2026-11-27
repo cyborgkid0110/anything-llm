@@ -345,6 +345,13 @@ const EMBEDDING_ENGINE_PROVIDER_PRIVACY_MAP = {
     ],
     logo: AnythingLLMIcon,
   },
+  embedded_lemonade: {
+    name: "AnythingLLM (GGUF)",
+    description: [
+      "Your document text is embedded privately on this instance of AnythingLLM.",
+    ],
+    logo: AnythingLLMIcon,
+  },
   openai: {
     name: "OpenAI",
     policyUrl: "https://openai.com/policies/privacy-policy/",

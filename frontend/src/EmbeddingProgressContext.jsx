@@ -22,7 +22,8 @@ export function useEmbeddingProgress() {
  * a callback when progress is cleared (embedding complete + auto-clear timeout).
  * @param {string} slug - Workspace slug
  * @param {Object} options
- * @param {Function} [options.onProgressCleared] - Called when progress transitions from active to cleared
+ * @param {(finalProgress: Object) => void} [options.onProgressCleared] - Called when progress transitions from active
+ * to cleared, with the last progress snapshot (each file's final status)
  */
 export function useWorkspaceEmbeddingProgress(
   slug,
@@ -47,7 +48,7 @@ export function useWorkspaceEmbeddingProgress(
   const prevProgressRef = useRef(embeddingProgress);
   useEffect(() => {
     if (prevProgressRef.current && !embeddingProgress) {
-      onProgressClearedRef.current?.();
+      onProgressClearedRef.current?.(prevProgressRef.current);
     }
     prevProgressRef.current = embeddingProgress;
   }, [embeddingProgress]);

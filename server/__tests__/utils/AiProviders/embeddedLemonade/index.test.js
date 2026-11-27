@@ -671,4 +671,296 @@ describe("deleteModel", () => {
     await expect(EmbeddedLemonadeLLM.deleteModel("")).resolves.toBe(true);
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  it("removes an imported model's folder", async () => {
+    const dir = path.join(
+      storage,
+      "models",
+      "embedded-lemonade",
+      "models--my-model"
+    );
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "my-model.gguf"), "GGUF");
+    mockLemond({
+      "GET /models/my-model": () =>
+        json({ checkpoint: "models--my-model/my-model.gguf" }),
+      "POST /delete": () => json({ status: "success" }),
+      "GET /models": () => json({ data: [] }),
+    });
+    await EmbeddedLemonadeLLM.deleteModel("my-model");
+    expect(fs.existsSync(dir)).toBe(false);
+  });
+});
+
+describe("importModel", () => {
+  const modelsDir = () => path.join(storage, "models", "embedded-lemonade");
+  // "GGUF" magic followed by the uint32 LE format version.
+  const GGUF_HEADER = Buffer.concat([
+    Buffer.from("GGUF"),
+    Buffer.from([3, 0, 0, 0]),
+  ]);
+  const GGUF_CONTENTS = Buffer.concat([GGUF_HEADER, Buffer.from("....")]);
+
+  function ggufFile(name = "My Model.Q4_K_M.gguf", contents = GGUF_CONTENTS) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gguf-src-"));
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, contents);
+    return file;
+  }
+
+  beforeEach(() => {
+    jest.spyOn(EmbeddedLemonadeEngine, "ensureRunning").mockResolvedValue();
+  });
+
+  it("places the file under models--<name> and registers it with lemond", async () => {
+    const file = ggufFile();
+    const pull = jest.fn(() =>
+      json({ status: "success", model_name: "user.My-Model.Q4_K_M" })
+    );
+    mockLemond({ "POST /pull": (_url, body) => pull(body) });
+
+    await expect(
+      EmbeddedLemonadeLLM.importModel(file, { kind: "embedding" })
+    ).resolves.toEqual({ modelId: "My-Model.Q4_K_M" });
+
+    const placed = path.join(
+      modelsDir(),
+      "models--My-Model.Q4_K_M",
+      "My Model.Q4_K_M.gguf"
+    );
+    expect(fs.readFileSync(placed)).toEqual(GGUF_CONTENTS);
+    expect(pull).toHaveBeenCalledWith({
+      model_name: "user.My-Model.Q4_K_M",
+      checkpoint: placed,
+      recipe: "llamacpp",
+      labels: ["embeddings"],
+      local_import: true,
+      stream: false,
+    });
+  });
+
+  it("labels chat imports as chat", async () => {
+    const pull = jest.fn(() => json({ status: "success" }));
+    mockLemond({ "POST /pull": (_url, body) => pull(body) });
+    await EmbeddedLemonadeLLM.importModel(ggufFile("chat.gguf"));
+    expect(pull.mock.calls[0][0].labels).toEqual(["chat"]);
+  });
+
+  it.each([
+    ["relative/path.gguf", "absolute path"],
+    ["/no/such/file.gguf", "does not exist"],
+  ])("rejects %p", async (file, message) => {
+    mockLemond({});
+    await expect(EmbeddedLemonadeLLM.importModel(file)).rejects.toThrow(
+      message
+    );
+  });
+
+  it("rejects files that are not GGUF", async () => {
+    mockLemond({});
+    await expect(
+      EmbeddedLemonadeLLM.importModel(ggufFile("fake.gguf", "<html>...."))
+    ).rejects.toThrow("not a GGUF file");
+    await expect(
+      EmbeddedLemonadeLLM.importModel(ggufFile("model.bin", GGUF_CONTENTS))
+    ).rejects.toThrow(".gguf");
+  });
+
+  it.each([
+    ["magic with junk after it", Buffer.from("GGUFjunk....")],
+    [
+      "an unknown version",
+      Buffer.concat([Buffer.from("GGUF"), Buffer.from([9, 0, 0, 0])]),
+    ],
+    ["version 0", Buffer.concat([Buffer.from("GGUF"), Buffer.alloc(4)])],
+    ["a truncated header", Buffer.from("GGUF")],
+  ])("rejects %s", async (_label, contents) => {
+    mockLemond({});
+    await expect(
+      EmbeddedLemonadeLLM.importModel(ggufFile("bad.gguf", contents))
+    ).rejects.toThrow("not a GGUF file");
+  });
+
+  it.each([1, 2, 3])("accepts GGUF version %i", async (version) => {
+    mockLemond({ "POST /pull": () => json({ status: "success" }) });
+    const header = Buffer.concat([
+      Buffer.from("GGUF"),
+      Buffer.from([version, 0, 0, 0]),
+    ]);
+    await expect(
+      EmbeddedLemonadeLLM.importModel(ggufFile(`v${version}.gguf`, header))
+    ).resolves.toEqual({ modelId: `v${version}` });
+  });
+
+  it("follows a symlink to the real file but names the model after the link", async () => {
+    mockLemond({ "POST /pull": () => json({ status: "success" }) });
+    // Like a Hugging Face cache entry: a relative link to an extension-less blob.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gguf-link-"));
+    fs.mkdirSync(path.join(dir, "blobs"));
+    fs.mkdirSync(path.join(dir, "snapshots"));
+    fs.writeFileSync(path.join(dir, "blobs", "abc123"), GGUF_CONTENTS);
+    const link = path.join(dir, "snapshots", "linked-model.gguf");
+    fs.symlinkSync(path.join("..", "blobs", "abc123"), link);
+
+    await expect(EmbeddedLemonadeLLM.importModel(link)).resolves.toEqual({
+      modelId: "linked-model",
+    });
+    const placed = path.join(
+      modelsDir(),
+      "models--linked-model",
+      "linked-model.gguf"
+    );
+    expect(fs.lstatSync(placed).isSymbolicLink()).toBe(false);
+    expect(fs.readFileSync(placed)).toEqual(GGUF_CONTENTS);
+  });
+
+  it("rejects a dangling symlink", async () => {
+    mockLemond({});
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gguf-link-"));
+    const link = path.join(dir, "gone.gguf");
+    fs.symlinkSync(path.join(dir, "missing"), link);
+    await expect(EmbeddedLemonadeLLM.importModel(link)).rejects.toThrow(
+      "does not exist"
+    );
+  });
+
+  it("refuses a name that is already imported", async () => {
+    fs.mkdirSync(path.join(modelsDir(), "models--chat"), { recursive: true });
+    mockLemond({});
+    await expect(
+      EmbeddedLemonadeLLM.importModel(ggufFile("chat.gguf"))
+    ).rejects.toThrow("already imported");
+  });
+
+  it("lets only one of two concurrent imports of the same name win", async () => {
+    mockLemond({ "POST /pull": () => json({ status: "success" }) });
+    // Both names sanitise to "same-name".
+    const first = ggufFile("same name.gguf");
+    const second = ggufFile("same-name.gguf");
+    const results = await Promise.allSettled([
+      EmbeddedLemonadeLLM.importModel(first),
+      EmbeddedLemonadeLLM.importModel(second),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual([
+      "fulfilled",
+      "rejected",
+    ]);
+    const loser = results.find((r) => r.status === "rejected");
+    expect(loser.reason.message).toMatch("already imported");
+    const winnerFile = results[0].status === "fulfilled" ? first : second;
+    const placed = path.join(
+      modelsDir(),
+      "models--same-name",
+      path.basename(winnerFile)
+    );
+    expect(fs.readFileSync(placed)).toEqual(GGUF_CONTENTS);
+  });
+
+  it("removes only the folder it created when the engine cannot start", async () => {
+    EmbeddedLemonadeEngine.ensureRunning.mockRejectedValue(
+      new Error("engine down")
+    );
+    mockLemond({});
+    await expect(
+      EmbeddedLemonadeLLM.importModel(ggufFile("down.gguf"))
+    ).rejects.toThrow("engine down");
+    expect(fs.existsSync(path.join(modelsDir(), "models--down"))).toBe(false);
+  });
+
+  it("removes the placed file when lemond refuses it, leaving the source alone", async () => {
+    mockLemond({
+      "POST /pull": () => json({ error: "bad model" }, 400),
+    });
+    const file = ggufFile("broken.gguf");
+    await expect(EmbeddedLemonadeLLM.importModel(file)).rejects.toThrow(
+      "bad model"
+    );
+    expect(fs.existsSync(path.join(modelsDir(), "models--broken"))).toBe(false);
+    expect(fs.readFileSync(file)).toEqual(GGUF_CONTENTS);
+  });
+});
+
+describe("importedModelName", () => {
+  it.each([
+    ["/a/b/Qwen3 4B (q4).gguf", "Qwen3-4B-q4"],
+    ["/a/b/model.GGUF", "model"],
+    ["/a/b/###.gguf", "model"],
+  ])("%p -> %p", (file, expected) => {
+    const {
+      importedModelName,
+    } = require("../../../../utils/AiProviders/embeddedLemonade");
+    expect(importedModelName(file)).toBe(expected);
+  });
+});
+
+describe("availableEmbeddingModels", () => {
+  const LEMOND_MODELS = [
+    {
+      id: "Qwen3-Embedding-0.6B-GGUF",
+      recipe: "llamacpp",
+      labels: ["embeddings"],
+      size: 0.64,
+      downloaded: false,
+    },
+    {
+      id: "minilm",
+      recipe: "llamacpp",
+      labels: ["custom", "embeddings"],
+      size: 0.02,
+      downloaded: true,
+    },
+    {
+      id: "Qwen3-4B-GGUF",
+      recipe: "llamacpp",
+      labels: ["chat"],
+      size: 2.5,
+      downloaded: true,
+    },
+    {
+      id: "bge-reranker",
+      recipe: "llamacpp",
+      labels: ["reranking"],
+      size: 0.3,
+      downloaded: true,
+    },
+    {
+      id: "whisper",
+      recipe: "whispercpp",
+      labels: ["embeddings"],
+      size: 0.1,
+      downloaded: true,
+    },
+  ];
+
+  it("lists only llama.cpp models labelled embeddings", async () => {
+    mockLemond({ "GET /models": () => json({ data: LEMOND_MODELS }) });
+    const models = await EmbeddedLemonadeLLM.availableEmbeddingModels();
+    expect(models.map((m) => [m.id, m.name, m.family, m.downloaded])).toEqual([
+      ["Qwen3-Embedding-0.6B-GGUF", "Qwen3-Embedding-0.6B", "Embedding", false],
+      ["minilm", "minilm", "Custom", true],
+    ]);
+    expect(models[0]).toMatchObject({
+      recipe: "llamacpp",
+      runtime: "Llama.cpp",
+      capabilities: null,
+    });
+  });
+
+  it("is empty when lemond cannot be reached", async () => {
+    mockLemond({});
+    await expect(
+      EmbeddedLemonadeLLM.availableEmbeddingModels()
+    ).resolves.toEqual([]);
+  });
+
+  it("lists only downloaded models without the catalog", async () => {
+    mockLemond({ "GET /models": () => json({ data: LEMOND_MODELS }) });
+    const {
+      getEmbeddedLemonadeEmbeddingModels,
+    } = require("../../../../utils/AiProviders/embeddedLemonade");
+    const { models } = await getEmbeddedLemonadeEmbeddingModels(false);
+    expect(models.map((m) => m.id)).toEqual(["minilm"]);
+    expect(models[0]).not.toHaveProperty("downloaded");
+  });
 });

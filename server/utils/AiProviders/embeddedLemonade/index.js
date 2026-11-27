@@ -484,6 +484,47 @@ class EmbeddedLemonadeLLM {
     return models;
   }
 
+  /**
+   * lemond's embedding models (labelled `embeddings`) - its catalog plus anything pulled or imported.
+   * @returns {Promise<{id: string, name: string, family: string, organization: string, size: string, downloaded: boolean, capabilities: null, recipe: string, deviceType: string, runtime: string, tags: string[]}[]>}
+   */
+  static async availableEmbeddingModels() {
+    if (!(await EmbeddedLemonadeLLM.bootOrContinue())) return [];
+    const lemondModels = await fetch(
+      `${EmbeddedLemonadeLLM.openaiBasePath()}/models?show_all=true`
+    )
+      .then((res) => res.json())
+      .then(({ data = [] }) =>
+        data.filter(
+          (model) =>
+            SUPPORTED_RECIPES.hasOwnProperty(model.recipe) &&
+            model.labels?.includes("embeddings")
+        )
+      )
+      .catch((e) => {
+        EmbeddedLemonadeLLM.slog(`Error getting embedding models`, e.message);
+        return [];
+      });
+
+    return lemondModels.map((model) => {
+      const family = model.labels.includes("custom") ? "Custom" : "Embedding";
+      return {
+        id: model.id,
+        name: model.id.replace(/-(GGUF|gguf)$/, ""),
+        family,
+        organization: family,
+        size: model.size
+          ? humanFileSize(model.size * 1024 ** 3)
+          : "Unknown size",
+        downloaded: !!model.downloaded,
+        capabilities: null,
+        recipe: model.recipe,
+        tags: [],
+        ...SUPPORTED_RECIPES[model.recipe],
+      };
+    });
+  }
+
   /** The registries to try, in order, for the EMBEDDED_LEMONADE_REGISTRY setting. */
   static registriesToTry() {
     const setting = REGISTRIES.includes(process.env.EMBEDDED_LEMONADE_REGISTRY)
@@ -566,6 +607,9 @@ class EmbeddedLemonadeLLM {
         .catch(() => ({}));
       checkpoint = info?.checkpoint ?? info?.checkpoints?.main ?? null;
     }
+    // Imported models live in models--<name>/ under models_dir already.
+    if (checkpoint?.startsWith("models--"))
+      return path.join(paths().models, checkpoint.split("/")[0]);
     const repo = checkpoint?.split(":")[0];
     if (!repo || !repo.includes("/")) return null;
     return path.join(paths().models, `models--${repo.split("/").join("--")}`);
@@ -746,6 +790,77 @@ class EmbeddedLemonadeLLM {
     return true;
   }
 
+  /**
+   * Imports a local GGUF file: places it in models_dir (hard link, or a copy across drives) and registers it with
+   * lemond as `user.<name>`. A symlink is followed, but the model is named after the path given.
+   * @param {string} filePath - absolute path to a .gguf file on this machine
+   * @param {{kind?: 'llm'|'embedding'}} options
+   * @returns {Promise<{modelId: string}>}
+   */
+  static async importModel(filePath, { kind = "llm" } = {}) {
+    if (!path.isAbsolute(String(filePath || "")))
+      throw new Error("Enter the absolute path of a .gguf file.");
+    if (path.extname(filePath).toLowerCase() !== ".gguf")
+      throw new Error("Only .gguf files can be imported.");
+    let source;
+    try {
+      source = fs.realpathSync(filePath);
+    } catch {
+      throw new Error(`${filePath} does not exist.`);
+    }
+    if (!fs.statSync(source, { throwIfNoEntry: false })?.isFile())
+      throw new Error(`${filePath} does not exist.`);
+    if (!isGguf(source)) throw new Error(`${filePath} is not a GGUF file.`);
+
+    const name = importedModelName(filePath);
+    const repoDir = path.join(paths().models, `models--${name}`);
+    fs.mkdirSync(paths().models, { recursive: true });
+    // Not recursive: failing on an existing folder is what makes concurrent imports of one name safe.
+    try {
+      fs.mkdirSync(repoDir);
+    } catch (e) {
+      if (e.code === "EEXIST")
+        throw new Error(`A model named ${name} is already imported.`);
+      throw e;
+    }
+
+    const placed = path.join(repoDir, path.basename(filePath));
+    try {
+      await EmbeddedLemonadeEngine.ensureRunning();
+      try {
+        fs.linkSync(source, placed);
+      } catch {
+        await fs.promises.copyFile(source, placed);
+      }
+      const response = await fetch(
+        `${EmbeddedLemonadeLLM.openaiBasePath()}/pull`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model_name: `user.${name}`,
+            checkpoint: placed,
+            recipe: "llamacpp",
+            labels: kind === "embedding" ? ["embeddings"] : ["chat"],
+            local_import: true,
+            stream: false,
+          }),
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.status !== "success")
+        throw new Error(
+          body?.error?.message ||
+            body?.error ||
+            "lemond could not import the model."
+        );
+      return { modelId: name };
+    } catch (e) {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      throw e;
+    }
+  }
+
   /** Deletes a model's files and registration in lemond. */
   static async #lemondDelete(modelId) {
     const response = await fetch(
@@ -798,6 +913,30 @@ class EmbeddedLemonadeLLM {
   }
 }
 
+/** A lemond-safe model name from a GGUF file name. */
+function importedModelName(filePath) {
+  const name = path
+    .basename(filePath, path.extname(filePath))
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  return name || "model";
+}
+
+/** Whether the file starts with the GGUF magic bytes and a known format version (1-3). */
+function isGguf(filePath) {
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const header = Buffer.alloc(8);
+    if (fs.readSync(fd, header, 0, 8, 0) < 8) return false;
+    return (
+      header.toString("ascii", 0, 4) === "GGUF" &&
+      [1, 2, 3].includes(header.readUInt32LE(4))
+    );
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 /**
  * The lemond id a Hugging Face style checkpoint is registered under. It is registered as `user.<id>` but lemond
  * lists, loads and deletes it by the plain id.
@@ -828,7 +967,25 @@ async function getEmbeddedLemonadeModels(includeCatalog = false) {
   };
 }
 
+/**
+ * Embedding models for the custom models endpoint - downloaded only (without the `downloaded` flag) unless the
+ * catalog is asked for (the model table).
+ * @param {boolean} includeCatalog
+ */
+async function getEmbeddedLemonadeEmbeddingModels(includeCatalog = false) {
+  const models = await EmbeddedLemonadeLLM.availableEmbeddingModels();
+  if (includeCatalog) return { models, error: null };
+  return {
+    models: models
+      .filter((model) => model.downloaded)
+      .map(({ downloaded: _, ...model }) => model),
+    error: null,
+  };
+}
+
 module.exports = {
   EmbeddedLemonadeLLM,
   getEmbeddedLemonadeModels,
+  getEmbeddedLemonadeEmbeddingModels,
+  importedModelName,
 };

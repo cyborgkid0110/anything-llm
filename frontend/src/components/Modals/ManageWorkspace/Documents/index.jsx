@@ -7,6 +7,7 @@ import Directory from "./Directory";
 import WorkspaceDirectory from "./WorkspaceDirectory";
 import useDocumentPicker from "./hooks/useDocumentPicker";
 import { useWorkspaceEmbeddingProgress } from "@/EmbeddingProgressContext";
+import { notifyDesktop } from "@/utils/desktop";
 
 const UPLOAD_FOLDER = "custom-documents";
 
@@ -44,7 +45,23 @@ export default function DocumentSettings({ workspace, variant = "default" }) {
 
   const { embeddingProgress, startEmbedding } = useWorkspaceEmbeddingProgress(
     workspace.slug,
-    { onProgressCleared: refresh }
+    {
+      onProgressCleared: (finalProgress) => {
+        refresh();
+        const files = Object.values(finalProgress ?? {});
+        const failed = files.find((file) => file.status === "failed");
+        if (failed)
+          notifyDesktop(
+            "Embedding failed",
+            (failed.error || "Embedding failed").slice(0, 120)
+          );
+        else if (files.some((file) => file.status === "complete"))
+          notifyDesktop(
+            "Documents embedded",
+            `${workspace.name} is up to date.`
+          );
+      },
+    }
   );
 
   /**
@@ -92,6 +109,7 @@ export default function DocumentSettings({ workspace, variant = "default" }) {
     startEmbedding(workspace.slug, filenames);
     embedPromise.catch((error) => {
       showToast(`Workspace update failed: ${error}`, "error", { clear: true });
+      notifyDesktop("Embedding failed", `${error}`.slice(0, 120));
     });
   };
 

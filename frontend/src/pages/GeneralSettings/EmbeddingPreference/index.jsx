@@ -34,6 +34,7 @@ import GenericOpenAiEmbeddingOptions from "@/components/EmbeddingSelection/Gener
 import OpenRouterOptions from "@/components/EmbeddingSelection/OpenRouterOptions";
 import MistralAiOptions from "@/components/EmbeddingSelection/MistralAiOptions";
 import LemonadeOptions from "@/components/EmbeddingSelection/LemonadeOptions";
+import EmbeddedLemonadeEmbeddingOptions from "@/components/EmbeddingSelection/EmbeddedLemonadeOptions";
 
 import EmbedderItem from "@/components/EmbeddingSelection/EmbedderItem";
 import { useModal } from "@/hooks/useModal";
@@ -148,6 +149,23 @@ const EMBEDDERS = [
   },
 ];
 
+/** Offered only when the server has the embedded Lemonade engine enabled. */
+const EMBEDDED_LEMONADE_EMBEDDER = {
+  name: "AnythingLLM (GGUF)",
+  value: "embedded_lemonade",
+  logo: AnythingLLMIcon,
+  options: (settings) => (
+    <EmbeddedLemonadeEmbeddingOptions settings={settings} />
+  ),
+  description:
+    "Download or import GGUF embedding models (eg: Qwen3-Embedding) and run them on this machine.",
+};
+
+// Some embedder options do not bubble up the change event, so they emit this one instead:
+// window.dispatchEvent(new Event(EMBEDDING_PREFERENCE_CHANGED_EVENT));
+export const EMBEDDING_PREFERENCE_CHANGED_EVENT =
+  "embedding-preference-changed";
+
 export default function GeneralEmbeddingPreference() {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -225,7 +243,26 @@ export default function GeneralEmbeddingPreference() {
     fetchKeys();
   }, []);
 
-  const selectedEmbedderObject = EMBEDDERS.find(
+  useEffect(() => {
+    function updateHasChanges() {
+      setHasChanges(true);
+    }
+    window.addEventListener(
+      EMBEDDING_PREFERENCE_CHANGED_EVENT,
+      updateHasChanges
+    );
+    return () => {
+      window.removeEventListener(
+        EMBEDDING_PREFERENCE_CHANGED_EVENT,
+        updateHasChanges
+      );
+    };
+  }, []);
+
+  const embedders = settings?.EmbeddedLemonadeEnabled
+    ? [EMBEDDERS[0], EMBEDDED_LEMONADE_EMBEDDER, ...EMBEDDERS.slice(1)]
+    : EMBEDDERS;
+  const selectedEmbedderObject = embedders.find(
     (embedder) => embedder.value === selectedEmbedder
   );
 
@@ -279,7 +316,7 @@ export default function GeneralEmbeddingPreference() {
               </div>
               <div className="relative">
                 <ProviderSearchMenu
-                  items={EMBEDDERS}
+                  items={embedders}
                   selected={selectedEmbedderObject}
                   placeholder="Search all embedding providers"
                   renderItem={(embedder, close) => (
@@ -301,10 +338,7 @@ export default function GeneralEmbeddingPreference() {
                 onChange={() => setHasChanges(true)}
                 className="mt-4 flex flex-col gap-y-1"
               >
-                {selectedEmbedder &&
-                  EMBEDDERS.find(
-                    (embedder) => embedder.value === selectedEmbedder
-                  )?.options(settings)}
+                {selectedEmbedder && selectedEmbedderObject?.options(settings)}
               </div>
             </div>
           </form>
