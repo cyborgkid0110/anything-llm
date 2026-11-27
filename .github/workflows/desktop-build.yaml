@@ -92,14 +92,20 @@ jobs:
           df -h .
 
       - name: Build installer
-        run: cd desktop && yarn dist
+        run: |
+          set +e
+          (cd desktop && yarn dist) 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          [ "$status" -eq 0 ] || bash desktop/scripts/ci-annotate.sh "yarn dist failed" build.log
+          exit "$status"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEBUG: electron-builder
 
       - name: Disk usage
         if: always()
-        run: df -h .
+        run: |
+          df -h .
+          echo "::notice title=Disk usage::$(df -h . | awk '{printf "%s%%0A", $0}')"
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
@@ -109,7 +115,10 @@ jobs:
         run: |
           # The unpacked build has no setuid chrome-sandbox helper.
           timeout 240 xvfb-run -a desktop/dist/linux-unpacked/anythingllm-custom --no-sandbox 2>&1 | tee "$RUNNER_TEMP/smoke.out"
-          grep -q "^SMOKE OK" "$RUNNER_TEMP/smoke.out"
+          grep -q "^SMOKE OK" "$RUNNER_TEMP/smoke.out" || {
+            bash desktop/scripts/ci-annotate.sh "Smoke test failed" "$RUNNER_TEMP/smoke.out"
+            exit 1
+          }
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
@@ -129,6 +138,14 @@ jobs:
           foreach ($f in $out, $err, $result) { if (Test-Path $f) { Get-Content $f } }
           $ok = (Test-Path $result) -and (Select-String -Path $result -Pattern "^SMOKE OK" -Quiet)
           if ($p.ExitCode -ne 0 -or -not $ok) {
+            $logs = Join-Path $env:ANYTHINGLLM_DESKTOP_USER_DATA "logs"
+            $summary = Join-Path $env:RUNNER_TEMP "smoke-summary.txt"
+            & {
+              foreach ($f in $result, $out, $err, (Join-Path $logs "server.log"), (Join-Path $logs "collector.log")) {
+                if (Test-Path $f) { "== $f"; Get-Content $f -Tail 40 }
+              }
+            } | Set-Content $summary
+            bash desktop/scripts/ci-annotate.sh "Smoke test failed (exit code $($p.ExitCode))" ($summary -replace '\\', '/') 80
             throw "Smoke test failed (exit code $($p.ExitCode))"
           }
 
