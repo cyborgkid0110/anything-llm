@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight } from "@phosphor-icons/react";
 import { useState } from "react";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import useRedirectToHomeOnOnboardingComplete from "@/hooks/useOnboardingComplete";
 import Home from "./Home";
 import LLMPreference from "./LLMPreference";
@@ -19,6 +19,7 @@ const OnboardingSteps = {
 export default OnboardingSteps;
 
 export function OnboardingLayout({ children }) {
+  const isMobile = useIsMobileLayout();
   useRedirectToHomeOnOnboardingComplete();
   const [header, setHeader] = useState({
     title: "",

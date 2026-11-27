@@ -72,7 +72,7 @@ export default function ReasoningEffortButton({
         data-tooltip-id="reasoning-effort"
         data-tooltip-content={t("chat.reasoning_effort.title")}
         aria-label={t("chat.reasoning_effort.title")}
-        className={`group border-none cursor-pointer flex items-center gap-x-1 h-6 px-1.5 rounded-full ${
+        className={`group border-none cursor-pointer flex items-center gap-x-1 h-9 md:h-6 px-1.5 rounded-full ${
           open
             ? "bg-zinc-700 light:bg-slate-200"
             : "hover:bg-zinc-700 light:hover:bg-slate-200"

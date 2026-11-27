@@ -14,10 +14,9 @@ export default function MobileConnectModal({ isOpen, onClose }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} variant="bare">
       <div
-        className="relative w-full rounded-lg shadow"
+        className="relative flex flex-col w-full max-w-[90vw] md:max-w-[70vw] max-h-[calc(100dvh-2rem)] rounded-lg shadow"
         style={{
           minHeight: "60vh",
-          maxWidth: "70vw",
           backgroundImage: `url(${BG})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
@@ -31,9 +30,9 @@ export default function MobileConnectModal({ isOpen, onClose }) {
           <X size={24} weight="bold" className="text-white" />
         </button>
 
-        <div className="flex w-full h-full justify-between p-[35px]">
+        <div className="flex flex-col gap-y-8 md:flex-row md:gap-y-0 w-full h-full min-h-0 overflow-y-auto justify-between p-6 md:p-[35px]">
           {/* left column */}
-          <div className="flex flex-col w-1/2 gap-y-[16px]">
+          <div className="flex flex-col w-full md:w-1/2 gap-y-[16px]">
             <p className="text-[#FFF] text-xl font-bold">
               Go mobile. Stay local. AnythingLLM Mobile.
             </p>
@@ -58,11 +57,11 @@ export default function MobileConnectModal({ isOpen, onClose }) {
           </div>
 
           {/* right column */}
-          <div className="flex flex-col items-center justify-center shrink-0 w-1/2 gap-y-[16px]">
-            <div className="bg-white/10 rounded-lg p-[40px] w-[300px] h-[300px] flex flex-col gap-y-[16px] items-center justify-center">
+          <div className="flex flex-col items-center justify-center shrink-0 w-full md:w-1/2 gap-y-[16px]">
+            <div className="bg-white/10 rounded-lg p-4 md:p-[40px] w-full max-w-[300px] md:w-[300px] aspect-square md:aspect-auto md:h-[300px] flex flex-col gap-y-[16px] items-center justify-center">
               <ConnectionQrCode isOpen={isOpen} />
             </div>
-            <p className="text-[#FFF] text-sm w-[300px] text-center">
+            <p className="text-[#FFF] text-sm w-full max-w-[300px] md:w-[300px] text-center">
               Scan the QR code with the AnythingLLM Mobile app to enable live
               sync of your workspaces, chats, threads and documents.
               <br />
@@ -134,7 +133,9 @@ const ConnectionQrCode = ({ isOpen }) => {
   if (isLoading) return <PreLoader size="[100px]" />;
   if (error)
     return (
-      <p className="text-red-500 text-sm w-[300px] p-4 text-center">{error}</p>
+      <p className="text-red-500 text-sm w-full max-w-[300px] md:w-[300px] p-4 text-center">
+        {error}
+      </p>
     );
 
   const size = {
@@ -145,6 +146,7 @@ const ConnectionQrCode = ({ isOpen }) => {
     <QRCodeSVG
       value={connectionInfo}
       size={300}
+      className="max-md:max-w-full max-md:h-auto"
       bgColor="transparent"
       fgColor="white"
       level="L"

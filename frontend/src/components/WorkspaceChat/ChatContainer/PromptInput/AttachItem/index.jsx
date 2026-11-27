@@ -102,7 +102,7 @@ export default function AttachItem({
         type="button"
         onClick={handleClick}
         onPointerEnter={fetchFiles}
-        className="group border-none relative flex justify-center items-center cursor-pointer w-6 h-6 rounded-full hover:bg-zinc-700 light:hover:bg-slate-200"
+        className="group border-none relative flex justify-center items-center cursor-pointer w-9 h-9 md:w-6 md:h-6 rounded-full hover:bg-zinc-700 light:hover:bg-slate-200"
       >
         <div className="relative">
           <Plus

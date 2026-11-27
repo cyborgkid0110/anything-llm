@@ -68,10 +68,10 @@ export default function ThreadItem({
       {/* Curved line inline placeholder for spacing - not visible */}
       <div
         style={{ width: THREAD_CALLOUT_DETAIL_WIDTH + 8 }}
-        className="h-full"
+        className="h-full shrink-0"
       />
       <div
-        className={`flex w-full items-center justify-between pr-2 group/thread relative ${isActive ? "bg-[var(--theme-sidebar-thread-selected)] light:bg-blue-200" : "hover:bg-theme-sidebar-subitem-hover light:hover:bg-slate-300"} rounded-[4px]`}
+        className={`flex w-full min-w-0 items-center justify-between pr-2 group/thread relative ${isActive ? "bg-[var(--theme-sidebar-thread-selected)] light:bg-blue-200" : "hover:bg-theme-sidebar-subitem-hover light:hover:bg-slate-300"} rounded-[4px]`}
       >
         {thread.deleted ? (
           <div className="w-full flex justify-between">
@@ -101,11 +101,11 @@ export default function ThreadItem({
             to={linkTo}
             data-tooltip-id="workspace-thread-name"
             data-tooltip-content={thread.name}
-            className="w-full pl-2 py-1 overflow-hidden"
+            className="w-full min-w-0 pl-2 py-2 md:py-1 overflow-hidden"
             aria-current={isActive ? "page" : ""}
           >
             <p
-              className={`text-left text-sm truncate max-w-[150px] ${
+              className={`text-left text-sm truncate ${
                 isActive
                   ? "font-semibold text-theme-text-primary light:text-blue-900"
                   : "text-theme-text-primary font-medium light:text-slate-800"
@@ -135,7 +135,7 @@ export default function ThreadItem({
               <div className="flex items-center w-fit md:invisible md:group-hover/thread:visible md:group-focus-within/thread:visible gap-x-1">
                 <button
                   type="button"
-                  className="border-none"
+                  className="border-none max-md:flex max-md:items-center max-md:justify-center min-h-9 min-w-9 md:min-h-0 md:min-w-0"
                   onClick={() => setShowOptions(!showOptions)}
                   aria-label="Thread options"
                 >

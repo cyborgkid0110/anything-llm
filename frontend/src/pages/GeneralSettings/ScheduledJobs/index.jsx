@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Sidebar from "@/components/SettingsSidebar";
-import { isMobile } from "react-device-detect";
 import ScheduledJobs from "@/models/scheduledJobs";
 import { subscribeToPushNotifications } from "@/hooks/useWebPushNotifications";
 import useWebPushNotifications from "@/hooks/useWebPushNotifications";
@@ -94,51 +93,59 @@ export default function ScheduledJobsPage() {
       showNewJobButton={jobs.length !== 0}
       handleCreate={handleCreate}
     >
-      <div className="pt-8">
-        <div className="flex items-center justify-between px-4 pb-[18px] text-xs font-semibold uppercase tracking-[1.4px] text-zinc-400 light:text-slate-600">
-          <span className="w-[150px]">{t("scheduledJobs.table.name")}</span>
-          <span className="w-[180px]">{t("scheduledJobs.table.schedule")}</span>
-          <span className="w-[120px]">{t("scheduledJobs.table.status")}</span>
-          <span className="w-[180px]">{t("scheduledJobs.table.lastRun")}</span>
-          <span className="w-[180px]">{t("scheduledJobs.table.nextRun")}</span>
-          <span className="w-[140px] text-right">
-            {t("scheduledJobs.table.actions")}
-          </span>
-        </div>
-        <div className="h-px w-full bg-white/10 light:bg-slate-300" />
+      <div className="pt-8 overflow-x-auto">
+        <div className="min-w-[950px] md:min-w-0">
+          <div className="flex items-center justify-between px-4 pb-[18px] text-xs font-semibold uppercase tracking-[1.4px] text-zinc-400 light:text-slate-600">
+            <span className="w-[150px]">{t("scheduledJobs.table.name")}</span>
+            <span className="w-[180px]">
+              {t("scheduledJobs.table.schedule")}
+            </span>
+            <span className="w-[120px]">{t("scheduledJobs.table.status")}</span>
+            <span className="w-[180px]">
+              {t("scheduledJobs.table.lastRun")}
+            </span>
+            <span className="w-[180px]">
+              {t("scheduledJobs.table.nextRun")}
+            </span>
+            <span className="w-[140px] text-right">
+              {t("scheduledJobs.table.actions")}
+            </span>
+          </div>
+          <div className="h-px w-full bg-white/10 light:bg-slate-300" />
 
-        {jobs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-8 py-24 text-center">
-            <div className="flex flex-col gap-1.5">
-              <p className="text-base font-semibold text-zinc-50 light:text-slate-950">
-                {t("scheduledJobs.emptyTitle")}
-              </p>
-              <p className="text-sm font-medium text-zinc-400 light:text-slate-600">
-                {t("scheduledJobs.emptySubtitle")}
-              </p>
+          {jobs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-8 py-24 text-center">
+              <div className="flex flex-col gap-1.5">
+                <p className="text-base font-semibold text-zinc-50 light:text-slate-950">
+                  {t("scheduledJobs.emptyTitle")}
+                </p>
+                <p className="text-sm font-medium text-zinc-400 light:text-slate-600">
+                  {t("scheduledJobs.emptySubtitle")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="border-none h-9 px-5 rounded-lg bg-zinc-50 text-zinc-950 light:bg-slate-900 light:text-white text-sm font-medium hover:bg-zinc-200 light:hover:bg-slate-800 transition-colors"
+              >
+                {t("scheduledJobs.newJob")}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="border-none h-9 px-5 rounded-lg bg-zinc-50 text-zinc-950 light:bg-slate-900 light:text-white text-sm font-medium hover:bg-zinc-200 light:hover:bg-slate-800 transition-colors"
-            >
-              {t("scheduledJobs.newJob")}
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col divide-y divide-white/5 light:divide-slate-300">
-            {jobs.map((job) => (
-              <JobRow
-                key={job.id}
-                job={job}
-                onTrigger={handleTrigger}
-                onToggle={handleToggle}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
+          ) : (
+            <div className="flex flex-col divide-y divide-white/5 light:divide-slate-300">
+              {jobs.map((job) => (
+                <JobRow
+                  key={job.id}
+                  job={job}
+                  onTrigger={handleTrigger}
+                  onToggle={handleToggle}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <Modal isOpen={isOpen} onClose={closeModal} size="md">
@@ -165,10 +172,7 @@ function BaseLayout({
   return (
     <div className="w-screen h-screen overflow-hidden bg-zinc-950 light:bg-slate-50 flex">
       <Sidebar />
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full overflow-y-scroll p-4 md:p-0"
-      >
+      <div className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full md:h-[calc(100%-32px)] overflow-y-scroll p-4 md:p-0">
         <div className="flex flex-col w-full px-1 md:pl-6 md:pr-[50px] md:py-6 py-16">
           <div className="w-full flex items-end justify-between gap-x-4 pb-6 border-white/10 light:border-slate-300 border-b-2">
             <div className="flex flex-col gap-y-2">

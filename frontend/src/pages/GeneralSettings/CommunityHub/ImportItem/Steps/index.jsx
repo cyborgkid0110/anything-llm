@@ -1,4 +1,3 @@
-import { isMobile } from "react-device-detect";
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/SettingsSidebar";
 import Introduction from "./Introduction";
@@ -64,10 +63,7 @@ export function CommunityHubImportItemLayout({ setStep, children }) {
   return (
     <div className="w-screen h-screen overflow-hidden bg-zinc-950 light:bg-slate-50 flex">
       <Sidebar />
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full overflow-y-scroll p-4 md:p-0"
-      >
+      <div className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full md:h-[calc(100%-32px)] overflow-y-scroll p-4 md:p-0">
         {children(settings, setSettings, setStep)}
       </div>
     </div>

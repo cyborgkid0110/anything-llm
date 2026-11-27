@@ -7,7 +7,7 @@ import PromptInput, {
 } from "./PromptInput";
 import Workspace from "@/models/workspace";
 import handleChat, { ABORT_STREAM_EVENT } from "@/utils/chat";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import { SidebarMobileHeader } from "../../Sidebar";
 import { useNavigate } from "react-router-dom";
 import { v4 } from "uuid";
@@ -46,6 +46,7 @@ export default function ChatContainer({
   threadSlug = null,
   knownHistory = [],
 }) {
+  const isMobile = useIsMobileLayout();
   const navigate = useNavigate();
   const greeting = useGreeting();
   const [loadingResponse, setLoadingResponse] = useState(false);
@@ -470,10 +471,7 @@ export default function ChatContainer({
   if (isEmpty) {
     return (
       <ChatSidebarProvider>
-        <div
-          style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-          className="relative flex md:ml-[2px] md:mr-[16px] md:my-[16px] w-full h-full z-[2]"
-        >
+        <div className="relative flex min-w-0 md:ml-[2px] md:mr-[16px] md:my-[16px] w-full h-full md:h-[calc(100%-32px)] z-[2]">
           <ChatSettingsMenu
             history={chatHistory}
             workspace={workspace}
@@ -528,10 +526,7 @@ export default function ChatContainer({
   return (
     <ChatSidebarProvider>
       <ActiveGenerationGuard isGenerating={loadingResponse} />
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative flex md:ml-[2px] md:mr-[16px] md:my-[16px] w-full h-full z-[2]"
-      >
+      <div className="relative flex min-w-0 md:ml-[2px] md:mr-[16px] md:my-[16px] w-full h-full md:h-[calc(100%-32px)] z-[2]">
         <ChatSettingsMenu
           history={chatHistory}
           workspace={workspace}

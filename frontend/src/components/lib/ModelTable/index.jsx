@@ -111,7 +111,8 @@ function DeviceTypeTagWrapper({ text, bgClass, textClass }) {
   return (
     <div
       className={
-        bgClass + " px-1.5 py-1 rounded-full flex items-center gap-x-1 w-fit"
+        bgClass +
+        " px-1.5 py-1 rounded-full flex items-center gap-x-1 w-fit shrink-0"
       }
     >
       <Cpu size={14} weight="bold" className={textClass} />
@@ -236,11 +237,11 @@ function ModelRow({
   return (
     <div
       ref={modelRowRef}
-      className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 transition-all duration-300 rounded-lg"
+      className="w-full grid grid-cols-[minmax(0,1fr)_auto_1fr] md:grid-cols-[1fr_auto_1fr] items-center gap-x-4 transition-all duration-300 rounded-lg"
     >
       <button
         type="button"
-        className="border-none flex items-center gap-x-[8px] whitespace-nowrap py-[8px] px-0"
+        className="border-none flex items-center gap-x-[8px] whitespace-nowrap py-[8px] px-0 min-w-0"
         disabled={processing}
         onClick={handleSetActiveModel}
       >
@@ -262,10 +263,17 @@ function ModelRow({
               className="text-theme-text-primary"
             />
           )}
-        <p className="text-theme-text-primary text-base">{model.name}</p>
-        <p className="text-theme-text-secondary opacity-70 text-base">
-          {fileSize}
-        </p>
+        <div className="min-w-0 flex flex-col items-start md:flex-row md:items-center md:gap-x-[8px]">
+          <p
+            title={model.name}
+            className="text-theme-text-primary text-base min-w-0 max-w-full truncate"
+          >
+            {model.name}
+          </p>
+          <p className="text-theme-text-secondary opacity-70 text-base shrink-0">
+            {fileSize}
+          </p>
+        </div>
       </button>
 
       <div className="justify-self-start">

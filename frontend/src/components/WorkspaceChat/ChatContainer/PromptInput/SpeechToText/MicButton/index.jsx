@@ -53,7 +53,7 @@ export default function MicButton({
       data-tooltip-content={`${t("chat_window.microphone")} (CTRL + M)`}
       aria-label={t("chat_window.microphone")}
       onClick={toggle}
-      className={`group border-none relative flex justify-center items-center cursor-pointer w-8 h-8 rounded-full hover:bg-zinc-700 light:hover:bg-slate-200 ${
+      className={`group border-none relative flex justify-center items-center cursor-pointer w-9 h-9 md:w-8 md:h-8 rounded-full hover:bg-zinc-700 light:hover:bg-slate-200 ${
         active ? "bg-zinc-700 light:bg-slate-200" : ""
       }`}
     >

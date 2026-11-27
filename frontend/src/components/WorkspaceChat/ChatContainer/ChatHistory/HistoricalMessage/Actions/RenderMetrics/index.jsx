@@ -1,7 +1,7 @@
 import { formatDateTimeAsMoment } from "@/utils/directories";
 import { formatDuration, numberWithCommas } from "@/utils/numbers";
 import React, { useEffect, useState, useContext } from "react";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 const MetricsContext = React.createContext();
 const SHOW_METRICS_KEY = "anythingllm_show_chat_metrics";
 const SHOW_METRICS_EVENT = "anythingllm_show_metrics_change";
@@ -100,6 +100,7 @@ export function MetricsProvider({ children }) {
  * @returns
  */
 export default function RenderMetrics({ metrics = {} }) {
+  const isMobile = useIsMobileLayout();
   // Inherit the showMetricsAutomatically state from the MetricsProvider so the state is shared across all chats
   const { showMetricsAutomatically, setShowMetricsAutomatically } =
     useContext(MetricsContext);

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/SettingsSidebar";
-import { isMobile } from "react-device-detect";
 import Admin from "@/models/admin";
 import { FullScreenLoader } from "@/components/Preloader";
 import { CaretRight, Flask } from "@phosphor-icons/react";
@@ -42,10 +41,7 @@ export default function ExperimentalFeatures() {
 
   if (loading) {
     return (
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full flex justify-center items-center"
-      >
+      <div className="relative min-w-0 md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full md:h-[calc(100%-32px)] flex justify-center items-center">
         <FullScreenLoader />
       </div>
     );
@@ -116,10 +112,7 @@ function FeatureLayout({ children }) {
       className="w-screen h-screen overflow-hidden bg-zinc-950 light:bg-slate-50 flex md:mt-0 mt-6"
     >
       <Sidebar />
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full flex"
-      >
+      <div className="relative min-w-0 md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full md:h-[calc(100%-32px)] flex">
         {children}
       </div>
     </div>

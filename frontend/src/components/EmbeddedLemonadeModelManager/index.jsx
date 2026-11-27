@@ -536,7 +536,7 @@ function PullFromHuggingFace({ onPull, kind }) {
 
   return (
     <div className="flex flex-col gap-y-2">
-      <div className="flex w-fit items-center gap-x-2">
+      <div className="flex w-full md:w-fit flex-wrap items-center gap-x-2 gap-y-2">
         <input
           value={repo}
           onChange={(e) => setRepo(e.target.value)}
@@ -545,7 +545,7 @@ function PullFromHuggingFace({ onPull, kind }) {
             e.preventDefault();
             handlePull();
           }}
-          className="border-none bg-theme-settings-input-bg text-white placeholder:text-theme-settings-input-placeholder text-sm rounded-lg focus:outline-primary-button active:outline-primary-button outline-none block w-[360px] p-2.5"
+          className="border-none bg-theme-settings-input-bg text-white placeholder:text-theme-settings-input-placeholder text-sm rounded-lg focus:outline-primary-button active:outline-primary-button outline-none block w-full md:w-[360px] p-2.5"
           type="text"
           placeholder={
             kind === "embedding"
@@ -756,7 +756,7 @@ function ModelBadges(model) {
   const mtp = model.tags?.includes("mtp") || /\bmtp\b/i.test(model.name);
   if (!mtp) return null;
   return (
-    <div className="flex items-center gap-x-1">
+    <div className="flex items-center gap-x-1 shrink-0">
       <Lightning
         size={16}
         weight="duotone"

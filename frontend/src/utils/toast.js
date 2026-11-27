@@ -25,6 +25,7 @@ function resolveTheme() {
 const showToast = (message, type = "default", opts = {}) => {
   const resolved = resolveTheme();
   const options = {
+    // Device check on purpose: phones put toasts at the top, away from the keyboard.
     position: isMobileOnly ? "top-center" : "bottom-center",
     autoClose: 5000,
     hideProgressBar: false,

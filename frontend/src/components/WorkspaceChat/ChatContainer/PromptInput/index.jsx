@@ -61,7 +61,7 @@ export default function PromptInput({
   const undoStack = useRef([]);
   const redoStack = useRef([]);
   const { textSize, textSizeClass } = useTextSize();
-  // iOS Safari zooms into inputs under 16px on focus, so mobile devices get at least 16px.
+  // Device check on purpose: iOS Safari zooms into inputs under 16px on focus, so mobile devices get at least 16px.
   const inputTextSizeClass =
     isMobile && textSize !== "large" ? "text-[16px]" : textSizeClass;
   const [searchParams] = useSearchParams();
@@ -450,7 +450,7 @@ function AgentSessionButton({
         data-tooltip-id="agent-session"
         data-tooltip-content={t("chat_window.start_agent_session")}
         aria-label={t("chat_window.start_agent_session")}
-        className="group border-none relative flex justify-center items-center cursor-pointer w-6 h-6 rounded-full hover:bg-zinc-700 light:hover:bg-slate-200"
+        className="group border-none relative flex justify-center items-center cursor-pointer w-9 h-9 md:w-6 md:h-6 rounded-full hover:bg-zinc-700 light:hover:bg-slate-200"
       >
         <At
           size={18}
@@ -484,7 +484,7 @@ function ToolsButton({
         setShowTools(!showTools);
         textareaRef.current?.focus();
       }}
-      className={`group border-none cursor-pointer flex items-center justify-center h-6 px-2 rounded-full ${
+      className={`group border-none cursor-pointer flex items-center justify-center h-9 md:h-6 px-2 rounded-full ${
         showTools
           ? "bg-zinc-700 light:bg-slate-200"
           : "hover:bg-zinc-700 light:hover:bg-slate-200"
@@ -512,7 +512,7 @@ function SendPromptButton({ formRef, promptInput, isDisabled }) {
         ref={formRef}
         type="submit"
         disabled={isDisabled || !promptInput.trim().length}
-        className={`border-none flex justify-center items-center rounded-full w-8 h-8 transition-all ${
+        className={`border-none flex justify-center items-center rounded-full w-9 h-9 md:w-8 md:h-8 transition-all ${
           promptInput.trim().length && !isDisabled
             ? "cursor-pointer bg-white hover:bg-zinc-200 light:bg-slate-800 light:hover:bg-slate-600"
             : "cursor-not-allowed bg-zinc-600 light:bg-slate-400"

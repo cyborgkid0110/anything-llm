@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import { SidebarMobileHeader } from "@/components/Sidebar";
 import PromptInput, {
   PROMPT_INPUT_EVENT,
@@ -163,10 +163,7 @@ export default function Home() {
 
   if (workspaceLoading) {
     return (
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="transition-all duration-500 relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full overflow-hidden"
-      />
+      <div className="transition-all duration-500 relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full md:h-[calc(100%-32px)] overflow-hidden" />
     );
   }
 
@@ -211,6 +208,7 @@ export default function Home() {
 }
 
 function HomeContent({ workspace, setWorkspace, threadSlug, setThreadSlug }) {
+  const isMobile = useIsMobileLayout();
   const { t } = useTranslation();
   const greeting = useGreeting();
   const navigate = useNavigate();
@@ -332,10 +330,7 @@ function HomeContent({ workspace, setWorkspace, threadSlug, setThreadSlug }) {
 
   return (
     <ChatSidebarProvider>
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative flex md:ml-[2px] md:mr-[16px] md:my-[16px] w-full h-full z-[2]"
-      >
+      <div className="relative flex min-w-0 md:ml-[2px] md:mr-[16px] md:my-[16px] w-full h-full md:h-[calc(100%-32px)] z-[2]">
         <ChatSettingsMenu />
         <div className="flex-1 min-w-0 transition-all duration-500 relative md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full overflow-hidden border-none light:border-solid light:border light:border-theme-modal-border">
           {isMobile && <SidebarMobileHeader />}
@@ -383,10 +378,7 @@ function HomeContent({ workspace, setWorkspace, threadSlug, setThreadSlug }) {
 function NoWorkspacesAssigned() {
   const { t } = useTranslation();
   return (
-    <div
-      style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-      className="transition-all duration-500 relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full overflow-hidden"
-    >
+    <div className="transition-all duration-500 relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full md:h-[calc(100%-32px)] overflow-hidden">
       <div className="flex flex-col h-full w-full items-center justify-center">
         <p className="text-white/60 text-sm text-center whitespace-pre-line">
           {t("home.notAssigned")}

@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { isMobile } from "react-device-detect";
 import CommunityHubImportItemSteps, {
   CommunityHubImportItemLayout,
 } from "./Steps";
@@ -9,11 +8,7 @@ function SideBarSelection({ setStep, currentStep }) {
     currentStep
   );
   return (
-    <div
-      className={`bg-white/5 light:bg-white text-theme-text-primary rounded-xl py-1 px-4 shadow-lg ${
-        isMobile ? "w-full" : "min-w-[360px] w-fit"
-      }`}
-    >
+    <div className="bg-white/5 light:bg-white text-theme-text-primary rounded-xl py-1 px-4 shadow-lg w-full md:w-fit md:min-w-[360px]">
       {Object.entries(CommunityHubImportItemSteps).map(
         ([stepKey, props], index) => {
           const isSelected = currentStep === stepKey;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import useUser from "@/hooks/useUser";
 import { useModal } from "@/hooks/useModal";
 import LLMSelectorModal from "../PromptInput/LLMSelector/index";
@@ -41,6 +41,7 @@ async function fetchModelName(slug, setModelName, t) {
 }
 
 export default function WorkspaceModelPicker({ workspaceSlug = null }) {
+  const isMobile = useIsMobileLayout();
   const { t } = useTranslation();
   const { slug: urlSlug } = useParams();
   const slug = urlSlug ?? workspaceSlug;

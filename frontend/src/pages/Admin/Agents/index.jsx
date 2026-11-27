@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Sidebar from "@/components/SettingsSidebar";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import Admin from "@/models/admin";
 import System from "@/models/system";
 import MCPServers from "@/models/mcpServers";
@@ -45,6 +45,7 @@ const IGNORE_CHANGE_SETTINGS = [
 ];
 
 export default function AdminAgents() {
+  const isMobile = useIsMobileLayout();
   const { t } = useTranslation();
   const formEl = useRef(null);
   const [hasChanges, setHasChanges] = useState(false);
@@ -341,10 +342,7 @@ export default function AdminAgents() {
 
   if (loading) {
     return (
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full flex justify-center items-center"
-      >
+      <div className="relative min-w-0 md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full md:h-[calc(100%-32px)] flex justify-center items-center">
         <FullScreenLoader />
       </div>
     );
@@ -810,10 +808,7 @@ function SkillLayout({ children, hasChanges, handleSubmit, handleCancel }) {
       className="w-screen h-screen overflow-hidden bg-zinc-950 light:bg-slate-50 flex md:mt-0 mt-6"
     >
       <Sidebar />
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full flex"
-      >
+      <div className="relative min-w-0 md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full md:h-[calc(100%-32px)] flex">
         {children}
         <ContextualSaveBar
           showing={hasChanges}
@@ -837,11 +832,7 @@ function SkillList({
 
   return (
     <>
-      <div
-        className={`bg-theme-bg-secondary text-white rounded-xl ${
-          isMobile ? "w-full" : "min-w-[360px] w-fit"
-        }`}
-      >
+      <div className="bg-theme-bg-secondary text-white rounded-xl w-full md:w-fit md:min-w-[360px]">
         {Object.entries(skills).map(([skill, settings], index) => (
           <div
             key={skill}

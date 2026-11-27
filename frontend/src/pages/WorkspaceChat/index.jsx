@@ -4,11 +4,12 @@ import Sidebar from "@/components/Sidebar";
 import { useParams } from "react-router-dom";
 import Workspace from "@/models/workspace";
 import PasswordModal, { usePasswordModal } from "@/components/Modals/Password";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import { FullScreenLoader } from "@/components/Preloader";
 import { LAST_VISITED_WORKSPACE } from "@/utils/constants";
 
 export default function WorkspaceChat() {
+  const isMobile = useIsMobileLayout();
   const { loading, requiresAuth, mode } = usePasswordModal();
 
   if (loading) return <FullScreenLoader />;

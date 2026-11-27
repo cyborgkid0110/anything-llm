@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/SettingsSidebar";
-import { isMobile } from "react-device-detect";
 import { CircleNotch } from "@phosphor-icons/react";
 import Telegram from "@/models/telegram";
 import ConnectedView from "./ConnectedView";
@@ -67,10 +66,7 @@ function ConnectionsLayout({ children, fullPage = false }) {
   return (
     <div className="w-screen h-screen overflow-hidden bg-zinc-950 light:bg-slate-50 flex md:mt-0 mt-6">
       <Sidebar />
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-2xl bg-zinc-900 light:bg-white light:border light:border-slate-300 w-full h-full overflow-y-scroll p-4 md:p-0"
-      >
+      <div className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-2xl bg-zinc-900 light:bg-white light:border light:border-slate-300 w-full h-full md:h-[calc(100%-32px)] overflow-y-scroll p-4 md:p-0">
         {fullPage ? (
           <div className="flex flex-col w-full px-1 md:pl-6 md:pr-[50px] md:py-6 py-16">
             <div className="w-full flex flex-col gap-y-2 pb-6 border-b border-white/20 light:border-slate-300">

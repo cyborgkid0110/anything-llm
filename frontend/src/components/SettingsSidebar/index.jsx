@@ -15,7 +15,7 @@ import {
 import AgentIcon from "@/media/animations/agent-static.png";
 import CommunityHubIcon from "@/media/illustrations/community-hub.png";
 import useUser from "@/hooks/useUser";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import Footer from "../Footer";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -26,6 +26,7 @@ import { CanViewChatHistoryProvider } from "../CanViewChatHistory";
 import useAppVersion from "@/hooks/useAppVersion";
 
 export default function SettingsSidebar() {
+  const isMobile = useIsMobileLayout();
   const { t } = useTranslation();
   const { logo } = useLogo();
   const { user } = useUser();

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import Sidebar from "@/components/SettingsSidebar";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import EmbedConfigsView from "./EmbedConfigs";
 import EmbedChatsView from "./EmbedChats";
 
 export default function ChatEmbedWidgets() {
+  const isMobile = useIsMobileLayout();
   const [selectedView, setSelectedView] = useState("configs");
   const [showViewModal, setShowViewModal] = useState(false);
 
@@ -103,10 +104,7 @@ function WidgetLayout({ children }) {
       className="w-screen h-screen overflow-hidden bg-zinc-950 light:bg-slate-50 flex md:mt-0 mt-6"
     >
       <Sidebar />
-      <div
-        style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-        className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full flex min-w-0"
-      >
+      <div className="relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] w-full h-full md:h-[calc(100%-32px)] flex min-w-0">
         {children}
       </div>
     </div>
@@ -124,9 +122,7 @@ function WidgetList({ selectedView, handleClick }) {
   };
 
   return (
-    <div
-      className={`bg-theme-bg-secondary text-white rounded-xl ${isMobile ? "w-full" : "min-w-[360px] w-fit"}`}
-    >
+    <div className="bg-theme-bg-secondary text-white rounded-xl w-full md:w-fit md:min-w-[360px]">
       {Object.entries(views).map(([view, settings], index) => (
         <div
           key={view}

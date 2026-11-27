@@ -56,7 +56,7 @@ export default function SearchBox({ user, showNewWsModal }) {
   }, []);
 
   return (
-    <div className="flex gap-x-[5px] w-full items-center h-[32px]">
+    <div className="flex gap-x-[5px] w-full items-center h-9 md:h-[32px]">
       <div className="relative h-full w-full flex">
         <input
           ref={searchRef}
@@ -201,7 +201,7 @@ function ShortWidthNewWorkspaceButton({ user, showNewWsModal }) {
         data-tooltip-id="new-workspace-tooltip"
         data-tooltip-content={t("new-workspace.title")}
         onClick={showNewWsModal}
-        className="border-none flex items-center justify-center bg-white  rounded-lg p-[8px] hover:bg-white/80 light:hover:bg-slate-300 transition-all duration-300"
+        className="border-none flex items-center justify-center bg-white  rounded-lg p-[10px] md:p-[8px] hover:bg-white/80 light:hover:bg-slate-300 transition-all duration-300"
       >
         <Plus
           size={16}

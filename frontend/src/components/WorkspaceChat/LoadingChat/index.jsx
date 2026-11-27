@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { CircleNotch } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import { SidebarMobileHeader } from "@/components/Sidebar";
 
 const MESSAGE_COUNT = 3;
 const ROTATE_MS = 3000;
 
 export default function LoadingChat() {
+  const isMobile = useIsMobileLayout();
   const { t } = useTranslation();
   const messages = [
     t("chat_window.loading_chat_history"),
@@ -29,10 +30,7 @@ export default function LoadingChat() {
   }, []);
 
   return (
-    <div
-      className="transition-all duration-500 relative md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full flex items-center justify-center"
-      style={{ height: isMobile ? "100%" : "calc(100% - 32px)" }}
-    >
+    <div className="transition-all duration-500 relative min-w-0 md:ml-[2px] md:mr-[16px] md:my-[16px] md:rounded-[16px] bg-zinc-900 light:bg-white w-full h-full md:h-[calc(100%-32px)] flex items-center justify-center">
       {isMobile && <SidebarMobileHeader />}
       <div
         role="status"

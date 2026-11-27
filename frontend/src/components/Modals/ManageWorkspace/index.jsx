@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import Workspace from "../../../models/workspace";
 import System from "../../../models/system";
-import { isMobileOnly } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import useUser from "../../../hooks/useUser";
 import DocumentSettings from "./Documents";
 import DataConnectors from "./DataConnectors";
@@ -14,6 +14,7 @@ import { useModalEscape } from "@/hooks/useModalEscape";
 
 const noop = () => {};
 const ManageWorkspace = ({ hideModal = noop, providedSlug = null }) => {
+  const isMobile = useIsMobileLayout();
   const { slug } = useParams();
   const { user } = useUser();
   const [workspace, setWorkspace] = useState(null);
@@ -40,7 +41,7 @@ const ManageWorkspace = ({ hideModal = noop, providedSlug = null }) => {
 
   // Portaled because the mobile sidebar drawer that opens this is transformed,
   // which would otherwise trap a fixed full-screen sheet inside it.
-  if (isMobileOnly) {
+  if (isMobile) {
     return createPortal(
       <div className="fixed inset-0 z-99 flex flex-col bg-zinc-900 light:bg-white pt-[env(safe-area-inset-top)]">
         <div className="shrink-0 flex items-center justify-between gap-x-3 pl-5 pr-3 h-14">

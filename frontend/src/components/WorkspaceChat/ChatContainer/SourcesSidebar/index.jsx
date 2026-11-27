@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { isMobile } from "react-device-detect";
+import useIsMobileLayout from "@/hooks/useIsMobileLayout";
 import { useTranslation } from "react-i18next";
 import { X } from "@phosphor-icons/react";
 import {
@@ -14,6 +14,7 @@ import ChatSidebar, { useSourcesSidebar } from "../ChatSidebar";
 export { useSourcesSidebar } from "../ChatSidebar";
 
 export default function SourcesSidebar() {
+  const isMobile = useIsMobileLayout();
   const { sources, sidebarOpen, closeSidebar } = useSourcesSidebar();
   const { t } = useTranslation();
   const [selectedSource, setSelectedSource] = useState(null);
